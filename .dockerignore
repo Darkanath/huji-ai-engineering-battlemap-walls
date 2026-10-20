@@ -1,0 +1,12 @@
+# Datasets and runs reach the container through volumes, not the build context
+data/raw
+data/processed
+runs
+mlruns
+out
+.git
+.venv
+**/__pycache__
+**/*.egg-info
+.pytest_cache
+.ruff_cache

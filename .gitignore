@@ -1,3 +1,41 @@
+# Datasets: keep the folder structure and the demo map, ignore everything else
+data/raw/**
+!data/raw/**/
+!data/raw/**/.gitkeep
+!data/raw/dungeondraft/demo-training-map.dd2vtt
+data/processed/**
+!data/processed/.gitkeep
+
+# Checkpoints and run logs
+runs/*
+!runs/.gitkeep
+mlruns/
+
+# Large files
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.zip
+*.tar
+*.tar.gz
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Rasterizer CLI default output
+out/
+
+# ---- GitHub Python template ----
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -1,0 +1,21 @@
+# One service for everything: tests, data tools, training and (later) the Gradio app.
+# Usage: docker compose run --rm app pytest
+services:
+  app:
+    build: .
+    image: battlemap-walls:latest
+    working_dir: /app
+    volumes:
+      # Datasets, checkpoints and run logs live on the host so they persist and can be showcased.
+      # Note: data/ also holds data-tool code, so the host copy of that code is what runs.
+      - ./data:/app/data
+      - ./runs:/app/runs
+      # Tests from the host, so editing a test needs no rebuild.
+      - ./tests:/app/tests
+    environment:
+      # Physical cores on the i7-1365U (6 cores, 12 threads).
+      OMP_NUM_THREADS: "6"
+      MKL_NUM_THREADS: "6"
+    ports:
+      # Gradio's default port, for the app in a later week.
+      - "7860:7860"

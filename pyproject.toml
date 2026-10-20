@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "battlemap-walls"
+version = "0.1.0"
+description = "Battlemap image -> Universal VTT (.dd2vtt) walls and portals for Roll20"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+# Added one step at a time as each part of the pipeline needs them.
+# torch/torchvision are installed from the CPU wheel index in the Dockerfile.
+dependencies = [
+    "numpy",
+    "Pillow",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+rasterize = "data.rasterize:main"
+
+[tool.setuptools.packages.find]
+include = ["data", "train", "eval", "postprocess", "app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
