@@ -13,6 +13,7 @@ mask into wall polylines and portal segments. Lights are out of scope: the outpu
 - Runs on CPU, under Docker
 
 See [`docs/PLAN.md`](docs/PLAN.md) for the full plan, data strategy and evaluation.
+Week-by-week tasks are in [`docs/roadmap/`](docs/roadmap/README.md).
 
 ## Status
 

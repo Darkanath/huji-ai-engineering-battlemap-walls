@@ -5,6 +5,8 @@ Universal VTT file (.dd2vtt) with walls and portals placed, ready to upload to R
 lighting and fog of war. The core is a semantic segmentation model (U-Net) trained in PyTorch.
 
 Full plan: `docs/PLAN.md`. Read it before starting a new piece of work. Final presentation: 2026-12-23.
+Week-by-week tasks, file names and done criteria: `docs/roadmap/week-NN.md` (index in
+`docs/roadmap/README.md`). Work from the current week's file and tick its boxes as tasks finish.
 
 ## Hard constraints (do not drift from these)
 
