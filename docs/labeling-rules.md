@@ -98,3 +98,4 @@ apply it everywhere.
 | Case | Decision | Example map |
 | --- | --- | --- |
 | Door flagged `freestanding` but sitting in a wall | Portal | `demo-training-map` |
+| Several portals stacked at the same position | One portal; the mask is the same either way. Deduplicate before counting portals or writing a .dd2vtt | `dd01_a`, `dd01_b` |
