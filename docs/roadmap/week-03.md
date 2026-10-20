@@ -1,7 +1,8 @@
 # Week 3 · 3–9.11 · First U-Net on synthetic data
 
 **Goal:** a U-Net (pretrained ResNet-18 encoder) trained on synthetic maps, logged to MLflow, and
-scored on the validation split against the Canny baseline.
+scored on the validation split against the Canny baseline. All training settings follow
+[training.md](../training.md).
 
 ## You
 
@@ -17,7 +18,7 @@ scored on the validation split against the Canny baseline.
 
 | File | What |
 | --- | --- |
-| `train/dataset.py` | Reads the manifest; loads image and mask pairs; rescales 70 -> 32 px per square (image: area interpolation, mask: nearest); samples random 256×256 crops, ~2,000 per epoch. |
+| `train/dataset.py` | Reads the manifest; loads the 32 px training copies; samples 2,000 biased 256×256 crops per epoch (50% on walls, 25% on portals, 25% anywhere; see training.md §2). |
 | `train/augment.py` | Flips, 90° rotations, color jitter, hue shift, blur, JPEG noise. Geometric changes go to image and mask together; color changes go to the image only. |
 | `train/model.py` | `smp.Unet("resnet18", classes=3)`, channels-last; device = XPU if `torch.xpu.is_available()`, else CPU; `torch.set_num_threads(6)`. |
 | `train/losses.py` | Cross-entropy + Dice, class weights computed from the training split's pixel shares in the manifest. |

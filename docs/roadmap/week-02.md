@@ -15,7 +15,7 @@ maps can be generated; predictions can be scored; the classical baseline has a f
 
 | File | What |
 | --- | --- |
-| `data/manifest.py` | Scan `data/raw/<dataset>/`, read layout and variant from `<layout>_<variant>`, assign splits by layout with a fixed seed (Dungeondraft 70/15/15, synthetic 90/10, `test/` always test), rasterize every map into `data/processed/<dataset>/`, write `data/processed/manifest.csv` (dataset, map, layout, variant, split, seed, pixel shares). Re-running it keeps existing splits. |
+| `data/manifest.py` | Scan `data/raw/<dataset>/`, read layout and variant from `<layout>_<variant>`, assign splits by layout with a fixed seed (Dungeondraft 70/15/15, synthetic 90/10, `test/` always test), rasterize every map into `data/processed/<dataset>/` at 70 px and write the 32 px training copies into `data/processed/<dataset>/32px/` (training.md §2), write `data/processed/manifest.csv` (dataset, map, layout, variant, split, seed, pixel shares). Re-running it keeps existing splits. |
 | `tests/test_manifest.py` | Variants of a layout share a split; same seed gives the same splits; CSV columns and shares are right. |
 | `data/generator.py` | Synthetic map generator (PLAN.md steps 1–6): rooms and corridors, doorless gaps of 1–3 squares, walls of varying width and color, doors and windows, furniture distractors, optional grid, tint, blur and JPEG noise. Writes `data/raw/synthetic/syn0001.dd2vtt` (embedded PNG image), one seed per map. Default 25×25 squares at 70 px. |
 | `data/configs/generator.toml` | Generator settings: counts, wall width range, gap and furniture probabilities. |

@@ -56,7 +56,7 @@ eval/            metrics (pixel IoU, boundary F1, visibility IoU), Canny baselin
 postprocess/     mask -> polylines -> portals -> .dd2vtt writer
 app/             Gradio app (upload, overlay preview, download .dd2vtt)
 notebooks/       exploration and figures for the presentation
-docs/            PLAN.md, labeling-rules.md, results
+docs/            PLAN.md, labeling-rules.md, training.md, roadmap/, results
 runs/            checkpoints and MLflow logs (gitignored)
 tests/           pytest
 ```
