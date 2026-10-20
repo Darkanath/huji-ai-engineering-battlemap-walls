@@ -95,7 +95,7 @@ Start with a U-Net on a pretrained ResNet-18 encoder (`segmentation_models_pytor
 **Training setup:**
 
 - Random 256×256 crops; flips, 90° rotations, color jitter, hue shifts, blur, JPEG noise.
-- Loss: cross-entropy + Dice. Walls are thin and rare (roughly 5–10% of pixels depending on wall thickness; 7.2% on the demo map), so plain cross-entropy will predict "background" everywhere. Add class weights or focal loss if Dice alone is not enough.
+- Loss: cross-entropy + Dice. Walls are thin and rare (roughly 5–10% of pixels depending on wall thickness; 7.4% on the demo map), so plain cross-entropy will predict "background" everywhere. Add class weights or focal loss if Dice alone is not enough.
 - Stage 1: train on synthetic data. Stage 2: fine-tune on Dungeondraft maps with a lower learning rate.
 - Inference: sliding 256 windows with overlap, averaged at the seams.
 - Track every run (MLflow or Weights & Biases): config, metrics, sample predictions.
