@@ -5,7 +5,7 @@ scored on the validation split against the Canny baseline.
 
 ## You
 
-- [ ] 5 more Dungeondraft layouts × 3 variants: `dd09`–`dd13`.
+- [ ] 5 more Dungeondraft layouts × 4 variants: `dd09`–`dd13`.
 - [ ] Start the hand-labeled test set (10–15 maps in total by week 6): collect the images in
       `data/raw/test/`, trace them following "Hand-tracing the test set" in the labeling rules.
       One way: trace over the image in Dungeondraft, export .dd2vtt, then replace its embedded

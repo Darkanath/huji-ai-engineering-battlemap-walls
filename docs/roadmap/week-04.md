@@ -5,7 +5,7 @@ predicted mask into a .dd2vtt. This is about half the engineering work, so it st
 
 ## You
 
-- [ ] Finish the Dungeondraft set: 15–20 layouts × 3 variants in total (`dd14`+ if needed).
+- [ ] Finish the Dungeondraft set: 15–20 layouts × 4 variants in total (`dd14`+ if needed).
 - [ ] Keep tracing test-set maps.
 
 ## Code

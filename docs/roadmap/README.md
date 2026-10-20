@@ -31,6 +31,6 @@ are in [PLAN.md](../PLAN.md); the rules for labels are in [labeling-rules.md](..
 
 - Configs are **TOML**, read with Python's built-in `tomllib`, so no YAML package is needed.
 - Every dataset is written to disk with a seed per map and listed in `data/processed/manifest.csv`.
-- Splits are by layout (`dd01_a`, `dd01_b` and `dd01_c` stay together) and are fixed by a seed.
+- Splits are by layout (`dd01_a` to `dd01_d` stay together) and are fixed by a seed.
 - The test set is run **once**, in week 8, after the model is chosen.
 - If a week slips, cut from the stretch items marked *(stretch)*, never from tests or the report.

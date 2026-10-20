@@ -6,8 +6,8 @@ the first Dungeondraft maps checked against those rules.
 ## You
 
 - [x] Make 3 Dungeondraft layouts at 25×25 squares, Roll20 grid preset: `dd01_a`, `dd02_a`, `dd03_a`.
-- [x] Export variants `b` and `c` of each layout (different wall style, floor texture, lighting or
-      grid). Shadows off on furniture. Name them `dd01_b.dd2vtt`, `dd01_c.dd2vtt`, and so on.
+- [x] Export variants `b`, `c` and `d` of each layout (different wall style, floor texture; `d`
+      without grid). Shadows off on furniture. Name them `dd01_b.dd2vtt` ... `dd01_d.dd2vtt`.
 - [ ] Upload `demo-training-map.dd2vtt` to Roll20 (Page Menu -> Upload Background). Check that the
       walls and doors appear and fog of war works. If you have time, also try a .dd2vtt whose
       embedded image is JPEG, to see whether output files can be lighter.
@@ -39,7 +39,7 @@ doors and windows.
 
 - [x] `docker compose run --rm app pytest` passes; `ruff check` is clean.
 - [x] Labeling rules written and linked from the README.
-- [x] 3 layouts × 3 variants exported, rasterized and checked; `docs/dungeondraft-maps.md` updated.
+- [x] 3 layouts × 4 variants exported, rasterized and checked; `docs/dungeondraft-maps.md` updated.
 - [ ] A .dd2vtt uploaded to Roll20 with working walls and doors.
 
 ## Report

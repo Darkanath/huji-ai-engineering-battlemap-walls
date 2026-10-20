@@ -67,10 +67,10 @@ source files.
 
 - **Map size:** 25×25 squares unless the layout needs otherwise.
 - **Export:** Universal VTT with the **Roll20 grid preset** (70 px per square).
-- **Style variants:** export each layout **3 times** with different wall styles, floor textures,
-  and lighting or grid on or off. Name them `<layout>_<variant>.dd2vtt`, for example
-  `dd01_a.dd2vtt`, `dd01_b.dd2vtt`, `dd01_c.dd2vtt`. The 3 variants of one layout always go in
-  the same split.
+- **Style variants:** export each layout **4 times** (`a`–`d`) with the same walls and portals
+  and different art: wall styles, floor textures (different floors across layouts too), lighting.
+  At least one variant has the **grid off**. Name them `<layout>_<variant>.dd2vtt`, for example
+  `dd01_a.dd2vtt` ... `dd01_d.dd2vtt`. All variants of one layout always go in the same split.
 - **Content:** walls, doors, windows, at least one doorless opening, and a scatter of furniture as
   distractors. No detailing needed.
 - **Shadows:** do not turn on shadow casting for furniture or other objects. Dungeondraft exports
@@ -98,4 +98,5 @@ apply it everywhere.
 | Case | Decision | Example map |
 | --- | --- | --- |
 | Door flagged `freestanding` but sitting in a wall | Portal | `demo-training-map` |
+| Glass window drawn as a thin plain line in the wall | Portal; subtle but visible | `dd03` (right-hand room) |
 | Several portals stacked at the same position | One portal; the mask is the same either way. Deduplicate before counting portals or writing a .dd2vtt | `dd01_a`, `dd01_b` |

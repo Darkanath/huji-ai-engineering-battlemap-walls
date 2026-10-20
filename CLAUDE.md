@@ -84,8 +84,8 @@ Datasets, checkpoints and logs are mounted as Docker volumes so they persist on 
 - Training: random 256x256 crops, ~2,000 crops per epoch, cross-entropy + Dice with class weights
   computed from the training split's pixel shares (wall share varies with wall thickness; demo
   map: walls 7.4%, portals 0.6%). Stage 1 synthetic, stage 2 fine-tune on Dungeondraft.
-- Splits are **by map, never by crop**; the 3 style exports of one Dungeondraft layout stay in the
-  same split. The test set is run once, at the end.
+- Splits are **by map, never by crop**; all style exports of one Dungeondraft layout (`dd01_a`..`dd01_d`)
+  stay in the same split. The test set is run once, at the end.
 - Post-processing: close small gaps with a kernel well under 0.25 square (doorless openings must
   stay open), skeletonize, trace, Douglas-Peucker, cut walls where portals cross, convert to grid
   units, write .dd2vtt.

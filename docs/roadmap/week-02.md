@@ -5,7 +5,7 @@ maps can be generated; predictions can be scored; the classical baseline has a f
 
 ## You
 
-- [ ] 5 more Dungeondraft layouts × 3 variants: `dd04`–`dd08`.
+- [ ] 5 more Dungeondraft layouts × 4 variants (`a`–`d`, one without grid): `dd04`–`dd08`.
 - [ ] Pick a small set of CC0 textures (floors, walls) and furniture sprites for the generator and
       put them in `data/assets/` with a `SOURCES.md` listing where each came from. Only CC0 or
       your own work.
