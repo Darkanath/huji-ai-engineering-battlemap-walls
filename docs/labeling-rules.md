@@ -90,6 +90,26 @@ and saved as .dd2vtt. The same rules apply:
 - Check the trace with the rasterizer preview, the same way as Dungeondraft maps.
 - Published third-party maps stay in the test set only and are never redistributed.
 
+**Tool: Dungeondraft**, tracing over the image, then swapping the original image into the export.
+
+1. **Prepare the image.** Crop it to a whole number of squares, with the grid starting at the
+   top-left corner. Save it as `data/raw/test/tNN.jpg` (or `.png`/`.webp`).
+2. **Record it** in `data/raw/test/test_maps.csv`: file, squares across and down, source and
+   license, and set (`in-domain` or `hard`).
+3. **Set up Dungeondraft.** New map with the same size in squares. Load the image as the trace
+   overlay and scale it so one image square equals one Dungeondraft square, corners aligned.
+4. **Trace.** Walls with the wall tool along the drawn walls' centerlines, ending at each side of
+   a doorless opening. Doors and windows as portals in those walls. Use the cave or free-form
+   tools for cliffs and cave walls. No objects, no lights, no shadows.
+5. **Export** Universal VTT as `tNN.dd2vtt`. Its embedded image is Dungeondraft's rendering,
+   not the test image.
+6. **Swap the image:** `python -m data.attach_image data/raw/test/tNN.dd2vtt data/raw/test/tNN.jpg`
+   embeds the original image and sets `pixels_per_grid` from its size. It refuses an image whose
+   size isn't `map_size` × a whole px per square.
+7. **Check:** `python -m data.rasterize data/raw/test/tNN.dd2vtt`. In the preview, red must sit
+   on the drawn walls of the original image and magenta on its doors and windows. If everything
+   is shifted the same way, the overlay was misaligned in step 3.
+
 ## Edge cases log
 
 When a map raises a case these rules don't cover, decide it, add it here with the map name, and

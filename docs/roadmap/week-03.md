@@ -8,9 +8,9 @@ scored on the validation split against the Canny baseline. All training settings
 
 - [ ] 5 more Dungeondraft layouts × 4 variants: `dd09`–`dd13`.
 - [ ] Start the hand-labeled test set (10–15 maps in total by week 6): collect the images in
-      `data/raw/test/`, trace them following "Hand-tracing the test set" in the labeling rules.
-      One way: trace over the image in Dungeondraft, export .dd2vtt, then replace its embedded
-      image with the original (`data/attach_image.py`, below). Third-party maps never leave
+      `data/raw/test/`, list them in `data/raw/test/test_maps.csv`, and trace them in Dungeondraft
+      following "Hand-tracing the test set" in the labeling rules (export, then
+      `data/attach_image.py` swaps the original image in). Third-party maps never leave
       `data/raw/test/`.
 - [ ] Start the overnight training run.
 
@@ -24,7 +24,7 @@ scored on the validation split against the Canny baseline. All training settings
 | `train/losses.py` | Cross-entropy + Dice, class weights computed from the training split's pixel shares in the manifest. |
 | `train/train.py` | Seeded training loop: frozen encoder for the first epochs, then unfreeze; validation each epoch (loss, wall IoU, boundary F1); best checkpoint by validation boundary F1 to `runs/<run>/`; everything logged to MLflow with the config. Saves sample predictions at early, middle and final epochs. |
 | `train/configs/stage1_synthetic.toml` | Stage 1 settings: data, epochs, learning rates, freeze schedule, seed. |
-| `data/attach_image.py` | Replace a .dd2vtt's embedded image with a given image file, checking the size matches `map_size` × `pixels_per_grid`. For the hand-traced test set. |
+| `data/attach_image.py` | Replace a .dd2vtt's embedded image with the original test image; set `pixels_per_grid` = image width / `map_size.x`; refuse images that aren't `map_size` × a whole px per square. For the hand-traced test set. |
 | `tests/test_dataset.py` | Crops are 256×256, masks hold only 0–2, rescaling keeps walls in place. |
 | `tests/test_train_smoke.py` | Two training steps on the demo map run without error and lower the loss. |
 | `tests/test_attach_image.py` | Size check rejects a wrong-sized image; output loads with `load_uvtt`. |
