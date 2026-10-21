@@ -24,7 +24,7 @@ Week 1 of 9 (final presentation 2026-12-23).
 - [x] Repo layout, Docker setup
 - [x] `.dd2vtt` -> class mask rasterizer, with tests
 - [x] Synthetic map generator and dataset manifest (splits, 70 px and 32 px copies)
-- [ ] Canny baseline, evaluation harness
+- [x] Metrics (pixel IoU/F1, wall boundary F1), Canny baseline, evaluation harness
 - [ ] U-Net training (synthetic, then fine-tuning on the real maps)
 - [x] Light labels in the rasterizer
 - [x] Dungeon Alchemist pilot (`da01`) and its light conversion (`data/retier_lights.py`)
@@ -59,6 +59,12 @@ Generate synthetic maps and build every dataset (splits, masks, 32 px training c
 ```bash
 docker compose run --rm app python -m data.generator --count 20
 docker compose run --rm app python -m data.manifest
+```
+
+Score a predictor on a split (per-map and mean metrics in `runs/<predictor>_<split>/metrics.csv`):
+
+```bash
+docker compose run --rm app python -m eval.evaluate --predictor canny --split val
 ```
 
 Dungeon Alchemist exports set light ranges per asset, not by tier. Map them to the tiers first

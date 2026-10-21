@@ -150,8 +150,15 @@ Run at the end of every epoch, on **whole maps**, not crops:
   than a minimum length -> draw them as 8 px walls. It predicts no portals and no lights (portal
   and light IoU are 0).
 - Tuning: a grid search over blur kernel, the two Canny thresholds, the close kernel and the
-  minimum length, on **real val**, maximizing wall boundary F1. The best values are
-  frozen in `eval/configs/baseline_canny.toml` and never changed after week 2.
+  minimum length, on **real val**, maximizing wall boundary F1 (`python -m eval.baseline_canny`).
+  The best values go into `eval/configs/baseline_canny.toml`, with a note of the maps they were
+  tuned on.
+- **First tuning (21.10):** on `dd03_a`–`dd03_d`, the only real val layout so far, a map with no
+  furniture, so the score is optimistic. Best: blur 7, Canny 20/40, close 5, min length 6
+  squares; val wall boundary F1 0.845 (IoU 0.384). The grid was widened twice until no winning
+  value sat on its edge.
+- **Retuned once, in week 4**, when the real set is complete (`--retune`), so the baseline is
+  tuned on the same val set the U-Net is selected on. After that the config is frozen.
 
 ## 8. CPU setup
 

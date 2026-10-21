@@ -11,6 +11,8 @@ Alchemist maps), and the post-processing that turns a predicted mask into a .dd2
       (add a rule for any new light asset), check each preview, and log them in
       [map-log.md](../map-log.md). That makes 19 real layouts in total.
 - [ ] Rebuild the manifest, so the new maps get their splits.
+- [ ] Retune the Canny baseline once on the complete real val split
+      (`python -m eval.baseline_canny --retune`), then leave it frozen.
 - [ ] Keep tracing test-set maps.
 
 ## Code

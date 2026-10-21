@@ -27,12 +27,12 @@ maps can be generated; predictions can be scored; the classical baseline has a f
 | `data/generator.py` + `data/synth/` *(done)* | Synthetic map generator (PLAN.md steps 1–7): rooms and corridors, doorless gaps of 1–3 squares, walls of varying width and color, doors and windows, light sprites of all three tiers with their `lights` entries (wall lights on the room side), unlit fixtures as distractors, furniture distractors, optional grid, tint, blur and JPEG noise. Writes `data/raw/synthetic/syn0001.dd2vtt` (embedded PNG image), one seed per map. Default 25×25 squares at 70 px. |
 | `data/configs/generator.toml` *(done)* | Generator settings: counts, wall width range, gap, furniture and light probabilities, lights per map and tier mix. |
 | `tests/test_generator.py` *(done)* | Same seed gives the same file; output loads with `load_uvtt`; rasterized mask has walls, portals, lights and at least one gap; every light's `range` is a tier value; shares in a sane range. |
-| `eval/metrics.py` | Pixel IoU and F1 per class (light included); wall boundary F1 with a 0.1-square tolerance. Light F1 and tier accuracy come in week 6. |
-| `tests/test_metrics.py` | Perfect prediction scores 1; empty prediction scores 0; a 2 px shift still scores high on boundary F1. |
-| `eval/baseline_canny.py` | Canny edges + contours -> wall mask, with thresholds read from a config. |
-| `eval/configs/baseline_canny.toml` | The thresholds, tuned once on the validation split, then frozen. |
-| `eval/evaluate.py` | Run a predictor over one split from the manifest and write per-map and mean metrics to `runs/<run>/metrics.csv`. |
-| `tests/test_baseline.py` | Runs on the demo map and returns a mask of the right shape and classes. |
+| `eval/metrics.py` *(done)* | Pixel IoU and F1 per class (light included); wall boundary F1 with a 0.1-square tolerance. Light F1 and tier accuracy come in week 6. |
+| `tests/test_metrics.py` *(done)* | Perfect prediction scores 1; empty prediction scores 0; a 2 px shift still scores high on boundary F1. |
+| `eval/baseline_canny.py` *(done)* | Canny edges + contours -> wall mask, with thresholds read from a config. |
+| `eval/configs/baseline_canny.toml` *(done)* | The thresholds, tuned once on the validation split, then frozen. |
+| `eval/evaluate.py` *(done)* | Run a predictor over one split from the manifest and write per-map and mean metrics to `runs/<run>/metrics.csv`. |
+| `tests/test_baseline.py`, `tests/test_evaluate.py` *(done)* | Runs on the demo map and returns a mask of the right shape and classes. |
 
 ## Run
 
@@ -48,13 +48,16 @@ docker compose run --rm app pytest
 - [x] 20 synthetic maps generated; their previews look right by the labeling rules, lights included
       (contact sheet checked 21.10; walls are axis-aligned only in v1).
 - [x] `manifest.csv` lists the demo, all Dungeondraft, Dungeon Alchemist and synthetic maps with splits.
-- [ ] Canny baseline tuned on validation, config frozen, validation scores saved.
+- [x] Canny baseline tuned on validation, config frozen, validation scores saved
+      (`runs/canny_val/metrics.csv`; tuned on `dd03` only, retuned once in week 4).
 - [ ] All tests pass.
 
 ## Report
 
 - Data summary table (maps, pixel shares and light counts per tier, per split), from `manifest.csv`.
-- First row of the results table: the Canny baseline on validation.
+- First row of the results table: the Canny baseline on validation. 21.10, real val (`dd03`, 4
+  maps): wall IoU 0.384, wall boundary F1 0.845, portal and light IoU 0. Synthetic val: wall
+  IoU 0.177, boundary F1 0.531.
 
 ## Dependencies
 

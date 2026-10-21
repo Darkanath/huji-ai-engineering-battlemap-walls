@@ -13,6 +13,7 @@ license = { text = "MIT" }
 dependencies = [
     "numpy",
     "Pillow",
+    "opencv-python-headless",  # week 2: Canny baseline, contours, distance transform for metrics
 ]
 
 [project.optional-dependencies]

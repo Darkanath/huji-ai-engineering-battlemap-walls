@@ -10,8 +10,12 @@ services:
       # Note: data/ also holds data-tool code, so the host copy of that code is what runs.
       - ./data:/app/data
       - ./runs:/app/runs
-      # Tests from the host, so editing a test needs no rebuild.
+      # Code and tests from the host, so editing them needs no rebuild (only new dependencies do).
       - ./tests:/app/tests
+      - ./eval:/app/eval
+      - ./train:/app/train
+      - ./postprocess:/app/postprocess
+      - ./app:/app/app
     environment:
       # Physical cores on the i7-1365U (6 cores, 12 threads).
       OMP_NUM_THREADS: "6"
