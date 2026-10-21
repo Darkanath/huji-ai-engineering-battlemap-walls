@@ -17,9 +17,9 @@ predicted mask into a .dd2vtt. This is about half the engineering work, so it st
 | `postprocess/clean.py` | Morphological close with a kernel well under 0.25 square (doorless gaps stay open); drop blobs under a minimum area. |
 | `postprocess/vectorize.py` | Skeletonize walls, trace the skeleton into polylines (graph walk from endpoints and junctions), simplify with Douglas–Peucker, optional snapping to horizontal and vertical. |
 | `postprocess/portals.py` | Each portal blob -> principal axis -> one segment; cut wall polylines where a portal crosses them. |
-| `postprocess/writer.py` | Write the .dd2vtt: `format`, `resolution` (70 px per square), `line_of_sight`, `portals`, empty `lights`, base64 PNG image. Pixel -> grid units, undoing the scale normalization. |
+| `postprocess/writer.py` | Write the .dd2vtt: `format`, `resolution` (70 px per square), `line_of_sight`, `portals`, `lights` (takes a list; empty until `postprocess/lights.py` exists in week 6), base64 PNG image. Pixel -> grid units, undoing the scale normalization. |
 | `tests/test_postprocess.py` | **Round trip:** rasterize the demo map's .dd2vtt -> vectorize -> write -> rasterize again; the masks match closely (wall IoU > 0.9) and the portal count is the same. A doorless gap stays open after cleaning. |
-| `tests/test_writer.py` | Output loads with `load_uvtt`; coordinates are in grid units; `lights` is empty. |
+| `tests/test_writer.py` | Output loads with `load_uvtt`; coordinates are in grid units; given lights are written with grid-unit positions and their `range`; no lights gives an empty list. |
 
 The skeleton tracer is written by hand, so `skan` is not needed.
 

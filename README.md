@@ -1,15 +1,17 @@
 # huji-ai-engineering-battlemap-walls
 
 Course project for AI Engineering (Hebrew University). Upload a top-down battlemap image and get
-back a Universal VTT file (`.dd2vtt`) with **walls** and **portals** (doors and windows) already
-placed, ready to upload to Roll20 for dynamic lighting and fog of war.
+back a Universal VTT file (`.dd2vtt`) with **walls**, **portals** (doors and windows) and **light
+sources** already placed, ready to upload to Roll20 for dynamic lighting and fog of war.
 
 The core is a semantic segmentation model (U-Net with a pretrained ResNet-18 encoder, PyTorch)
-that labels every pixel as background, wall or portal. A post-processing pipeline then turns the
-mask into wall polylines and portal segments. Lights are out of scope: the output has none.
+that labels every pixel as background, wall, portal or light. A post-processing pipeline then
+turns the mask into wall polylines, portal segments and lights. Each light's brightness comes from
+its size tier (small: torch, medium: brazier, large: bonfire) and an editable lookup table, since
+an image does not show how far a light reaches.
 
 - Input: `.png`, `.jpg`/`.jpeg` or `.webp` image
-- Output: `.dd2vtt` (walls, portals, embedded map image), at 70 px per grid square
+- Output: `.dd2vtt` (walls, portals, lights, embedded map image), at 70 px per grid square
 - Runs on CPU, under Docker
 
 See [`docs/PLAN.md`](docs/PLAN.md) for the full plan, data strategy and evaluation.
@@ -23,7 +25,9 @@ Week 1 of 9 (final presentation 2026-12-23).
 - [x] `.dd2vtt` -> class mask rasterizer, with tests
 - [ ] Synthetic map generator, Canny baseline, evaluation harness
 - [ ] U-Net training (synthetic, then Dungeondraft fine-tuning)
+- [ ] Light labels in the rasterizer; Dungeondraft maps re-exported with lights
 - [ ] Mask -> `.dd2vtt` post-processing and writer
+- [ ] Light post-processing (blob -> position and size tier -> range)
 - [ ] Gradio app
 
 ## Quick start
@@ -43,7 +47,8 @@ docker compose run --rm app python -m data.rasterize \
     data/raw/dungeondraft/demo-training-map.dd2vtt --out data/processed/demo
 ```
 
-Mask classes: `0` background, `1` wall, `2` portal. Masks are always PNG so class ids stay exact.
+Mask classes: `0` background, `1` wall, `2` portal, `3` light. Masks are always PNG so class ids
+stay exact.
 
 ## Repo layout
 
@@ -53,7 +58,7 @@ data/            rasterize.py (.dd2vtt -> mask); later the synthetic generator a
   processed/     image + mask pairs, manifest.csv (gitignored)
 train/           dataset, augmentations, training loop, configs/
 eval/            metrics (pixel IoU, boundary F1, visibility IoU), Canny baseline, reports
-postprocess/     mask -> polylines -> portals -> .dd2vtt writer
+postprocess/     mask -> polylines -> portals -> lights -> .dd2vtt writer
 app/             Gradio app (upload, overlay preview, download .dd2vtt)
 notebooks/       exploration and figures for the presentation
 docs/            PLAN.md, labeling-rules.md, training.md, roadmap/, results

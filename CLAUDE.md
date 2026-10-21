@@ -1,8 +1,9 @@
 # Battlemap Auto-Walling
 
 Course project (Hebrew University, AI Engineering). Upload a top-down battlemap image and get back a
-Universal VTT file (.dd2vtt) with walls and portals placed, ready to upload to Roll20 for dynamic
-lighting and fog of war. The core is a semantic segmentation model (U-Net) trained in PyTorch.
+Universal VTT file (.dd2vtt) with walls, portals and light sources placed, ready to upload to
+Roll20 for dynamic lighting and fog of war. The core is a semantic segmentation model (U-Net)
+trained in PyTorch.
 
 Full plan: `docs/PLAN.md`. Read it before starting a new piece of work. Final presentation: 2026-12-23.
 Week-by-week tasks, file names and done criteria: `docs/roadmap/week-NN.md` (index in
@@ -15,8 +16,12 @@ Week-by-week tasks, file names and done criteria: `docs/roadmap/week-NN.md` (ind
   hand-written HTML; the UI is built with Gradio.
 - **Images in.** Inference input is an image only: `.png`, `.jpg`/`.jpeg`, `.webp`.
 - **Labels come only from .dd2vtt files.** Never read or depend on `.dungeondraft_map` source files.
-- **3 classes:** `0 = background`, `1 = wall`, `2 = portal` (doors and windows together; no
-  door/window split, not even as a stretch goal).
+- **4 classes:** `0 = background`, `1 = wall`, `2 = portal` (doors and windows together; no
+  door/window split, not even as a stretch goal), `3 = light` (a drawn light source: torch,
+  candle, lantern, brazier, campfire, bonfire). One light class only; brightness comes from the
+  blob's **size tier** (small / medium / large) and a lookup table, never from a learned
+  regression. Lights are lower priority than walls and portals: if time runs short, they are cut
+  first.
 - **CPU only.** Intel CPU, no NVIDIA GPU. Install the CPU-only PyTorch build. Never add CUDA
   dependencies or `.cuda()` calls. Use `torch.device("xpu")` only if `torch.xpu.is_available()`,
   otherwise CPU.
@@ -64,7 +69,9 @@ Datasets, checkpoints and logs are mounted as Docker volumes so they persist on 
 - `objects_line_of_sight`: extra sight blockers; treat as walls.
 - `portals`: each has `position`, `bounds` (2 endpoints), `rotation`, `closed`, `freestanding`.
   No door/window type.
-- `lights`: written empty by this project.
+- `lights`: each has `position`, `range` (grid squares), `intensity`, `color`, `shadows`. Labels
+  read `position` and map `range` to a size tier; the output writes one light per detected blob,
+  with `range` and `intensity` from the tier table (`postprocess/configs/lights.toml`).
 - `image`: base64-encoded PNG of the map. **This embedded image is the source of truth** for
   training. A same-named `.png` next to a `.dd2vtt` in `data/raw/` is optional: use it only for
   viewing, and if code reads it, first check its size matches `map_size` x `pixels_per_grid`.
@@ -91,7 +98,11 @@ Datasets, checkpoints and logs are mounted as Docker volumes so they persist on 
   units, write .dd2vtt.
 - Labeling rules: wall = blocks sight and movement (building walls, palisades, cave walls,
   cliffs). Portal = door or window in a wall. An open gap with no door is just a gap. Furniture,
-  counters, rugs, trees, boulders and water are not walls.
+  counters, rugs, trees, boulders and water are not walls. Light = a lit light source drawn in the
+  image; its tier is set by its `range` in the .dd2vtt (see `docs/labeling-rules.md`).
+- Lights in the mask: a disc at the light's `position`, radius by tier (0.25 / 0.40 / 0.60
+  squares), drawn **under** walls and portals so a wall-mounted torch never cuts a gap in a wall.
+  Post-processing: light blob -> centroid (position) + area (tier) -> range from the tier table.
 - Data licensing: train only on synthetic maps and maps the user made. Published third-party maps
   go in the test set only and are never redistributed.
 

@@ -35,3 +35,7 @@ how the models are trained is in [training.md](../training.md).
 - Splits are by layout (`dd01_a` to `dd01_d` stay together) and are fixed by a seed.
 - The test set is run **once**, in week 8, after the model is chosen.
 - If a week slips, cut from the stretch items marked *(stretch)*, never from tests or the report.
+- Items marked *(lights)* are light-source work. They come after the week 5 milestone and are cut
+  next after the stretch items, never walls or portals. Light labels (rasterizer, generator,
+  Dungeondraft maps) are not marked: they are needed from week 2 so every run trains with 4
+  classes.

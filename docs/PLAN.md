@@ -4,7 +4,7 @@ Oct 20, 2026 · @Tal
 
 ## Overview
 
-Upload a battlemap image, get back a .dd2vtt file with walls and doors (and optionally windows) already placed, ready to drop into Roll20. The core is a semantic segmentation model trained in PyTorch, wrapped in a pipeline that turns its pixel masks into Universal VTT line-of-sight data.
+Upload a battlemap image, get back a .dd2vtt file with walls, doors, windows and light sources already placed, ready to drop into Roll20. The core is a semantic segmentation model trained in PyTorch, wrapped in a pipeline that turns its pixel masks into Universal VTT line-of-sight data.
 
 **Why it matters:** tracing walls by hand for dynamic lighting takes a GM 20–30 minutes per map. Existing tools (Auto-Wall, Dungeon Channel) use classical edge or color detection and struggle with textured maps and furniture. A learned model can tell a wall from a table.
 
@@ -26,10 +26,10 @@ The MVP targets indoor, top-down maps in a Dungeondraft-like style. Outdoor maps
 |  | In | Out or stretch |
 | --- | --- | --- |
 | Map types | Indoor dungeons, buildings, taverns | Outdoor Dungeondraft-style maps: stretch goal, 5–8 added to training and shown in the demo. Photoreal maps: hard test set only, reported honestly |
-| Classes | Background, wall, portal (doors and windows together) | Lights (stretch), sight-blocking objects like pillars (stretch) |
+| Classes | Background, wall, portal (doors and windows together), light (one class; brightness from a size tier) | Sight-blocking objects like pillars (stretch); light color, flicker, learned brightness |
 | Grid | Auto-detect from a visible grid; user enters size in squares as fallback | Hex grids |
 | Multi-floor images | User crops each floor before upload | Automatic floor splitting |
-| Output | .dd2vtt with walls, portals, embedded image | Native Roll20 API integration |
+| Output | .dd2vtt with walls, portals, lights, embedded image | Native Roll20 API integration |
 | Never | Traps and secret doors (not visible in the image by design) |  |
 
 ## System architecture
@@ -56,20 +56,24 @@ Build this first; every dataset depends on it. It reads a .dd2vtt, draws each `l
 
 **Decided (20.10): inputs are images only (.png, .jpg, .webp); training labels come only from the .dd2vtt.** The .dd2vtt `portals` carry no door/window type, so the MVP uses one **portal** class for both. Roll20 imports every portal as a door, and the GM flips the few windows by hand. The rasterizer prototype (`rasterize.py`) produced correct masks on the first demo map: wall 7.2% of pixels, portal 0.6%, which confirms class weighting is needed.
 
+**Decided (21.10): light sources are a 4th class.** The .dd2vtt `lights` give each light's `position` and `range`. Brightness cannot be read from the image (the same torch sprite could be 20 ft or 40 ft of light), so the model does not learn it. Each light gets a **size tier** instead (small: candle, torch; medium: lantern, brazier, campfire; large: bonfire), set by its `range` when the map is made. The rasterizer draws a disc whose radius depends on the tier (0.25 / 0.40 / 0.60 squares), under the walls so a wall torch never cuts a gap in a wall. At inference, each light blob's centroid is the position and its area picks the tier; a lookup table (D&D 5e values where they exist, editable in the app) gives the range. The tier table and the rules are in `labeling-rules.md`. Lights rank below walls and portals: the model trains with 4 classes from the first run (so no extra runs), but the light post-processing, metric and app controls come after the week 5 milestone, and are cut first if time runs short.
+
 ### Synthetic generator
 
 1. Random rooms-and-corridors layout on a 25×25-square grid by default (BSP split or random placement). Leave some walls open: gaps of 1–3 squares with no door, so the model learns that an opening is not a broken wall.
 2. Render floors and walls with CC0 textures; vary wall thickness, color and outline.
 3. Place doors and windows on wall segments.
-4. Scatter furniture sprites as distractors: tables, beds, barrels, rugs. This teaches the model what is *not* a wall.
-5. Optional overlays: grid lines, lighting tint, blur, JPEG noise.
-6. Save each map's image and its .dd2vtt together, written by the same script. The generator decided where every wall and portal goes, so the labels cost nothing and are exact; no manual work per map. The same rasterizer then handles synthetic and Dungeondraft data alike.
+4. Place light source sprites (torches on walls, braziers, campfires, bonfires), each with a light of its tier's `range`, plus some unlit fixtures as distractors.
+5. Scatter furniture sprites as distractors: tables, beds, barrels, rugs. This teaches the model what is *not* a wall.
+6. Optional overlays: grid lines, lighting tint, blur, JPEG noise.
+7. Save each map's image and its .dd2vtt together, written by the same script. The generator decided where every wall, portal and light goes, so the labels cost nothing and are exact; no manual work per map. The same rasterizer then handles synthetic and Dungeondraft data alike.
 
 **Volume and storage.** Rendering one map takes about a second, so 500 maps is a few minutes on a laptop. At 70 px per square (Roll20's default; export Dungeondraft maps with its Roll20 grid preset), the default 25×25-square map is a 1750×1750 image, stored as JPEG (quality 90) at about 0.6 MB; masks stay PNG because JPEG would corrupt the class ids. With its .dd2vtt (which embeds the image again) and mask, that is about 3 MB per map, so 500 maps is about 1.5 GB. If the ablation shows more synthetic data helps, generate more to disk the same way. Every dataset is saved to disk, never generated on the fly, so it can be showcased and reproduced: each map keeps its image, .dd2vtt and mask, with a fixed random seed, and a manifest (CSV) lists every map's dataset, split and seed. A thumbnail contact sheet per dataset goes in the presentation.
 
 ### Dungeondraft maps
 
-- Build rough 25×25-square maps fast (15–20 minutes each): walls, doors, windows, a scatter of furniture. No detailing.
+- Build rough 25×25-square maps fast (15–20 minutes each): walls, doors, windows, at least 3 lit light sources of two or more tiers, a scatter of furniture. No detailing.
+- Re-export `dd01`–`dd03` (all four variants) with lights added; their first exports have none.
 - Export each layout 4 times (`a`–`d`) with different wall styles, floor textures, and lighting; at least one variant without grid.
 - The `.dungeondraft_map` source file is not used; labels come only from the .dd2vtt export.
 
@@ -81,6 +85,7 @@ Write these down in week 1 and apply them everywhere:
 - **Door** = a gap in a wall with a door drawn in. An open archway is just a gap, no portal.
 - **Window** = see-through barrier in a wall. Doors and windows both get the one portal class.
 - **Not walls:** furniture, counters, rugs, trees, boulders, water.
+- **Light** = a lit light source drawn in the image (flame or lamp visible), with a size tier. Unlit fixtures and glow without a source are background.
 
 ### Licensing
 
@@ -88,14 +93,14 @@ Train only on synthetic maps and maps you made. Published maps (e.g. Red Raspus)
 
 ## Model & training
 
-Start with a U-Net on a pretrained ResNet-18 encoder (`segmentation_models_pytorch`), 3 output classes (background, wall, portal). It is simple, well understood, and strong on thin structures.
+Start with a U-Net on a pretrained ResNet-18 encoder (`segmentation_models_pytorch`), 4 output classes (background, wall, portal, light). It is simple, well understood, and strong on thin structures.
 
 **Scale normalization.** Before training and inference, resize every map so one grid square = a fixed size (32 px for training on CPU). Walls then always look about the same thickness, which makes the task much easier. This is why grid detection matters.
 
 **Training setup:**
 
 - Random 256×256 crops; flips, 90° rotations, color jitter, hue shifts, blur, JPEG noise.
-- Loss: cross-entropy + Dice. Walls are thin and rare (roughly 5–10% of pixels depending on wall thickness; 7.4% on the demo map), so plain cross-entropy will predict "background" everywhere. Add class weights or focal loss if Dice alone is not enough.
+- Loss: cross-entropy + Dice. Walls are thin and rare (roughly 5–10% of pixels depending on wall thickness; 7.4% on the demo map), portals rarer (under 1%) and lights rarer still (about 0.1–0.3%, *estimate*), so plain cross-entropy will predict "background" everywhere. Add class weights or focal loss if Dice alone is not enough.
 - Stage 1: train on synthetic data. Stage 2: fine-tune on Dungeondraft maps with a lower learning rate.
 - Inference: sliding 256 windows with overlap, averaged at the seams.
 - Track every run (MLflow or Weights & Biases): config, metrics, sample predictions.
@@ -125,10 +130,11 @@ Turning masks into clean line segments is about half the engineering work. Budge
 3. **Trace** the skeleton into polylines (graph walk from endpoints and junctions; `skan` can help).
 4. **Simplify** each polyline with Douglas–Peucker (`cv2.approxPolyDP`); optionally snap near-horizontal and near-vertical segments to the axes.
 5. **Portals:** each connected portal blob → its principal axis → one segment. Cut the wall polyline where a portal crosses it, so the door is not also a wall.
-6. **Convert** pixel coordinates to grid units (÷ `pixels_per_grid`), undoing the scale normalization.
-7. **Write** the .dd2vtt: `format`, `resolution`, `line_of_sight`, `portals`, empty `lights`, and the base64 image.
+6. **Lights:** each light blob (after dropping tiny ones) → centroid = position; equivalent radius → nearest tier; tier → `range` and `intensity` from `postprocess/configs/lights.toml`.
+7. **Convert** pixel coordinates to grid units (÷ `pixels_per_grid`), undoing the scale normalization.
+8. **Write** the .dd2vtt: `format`, `resolution`, `line_of_sight`, `portals`, `lights`, and the base64 image.
 
-**Check it in Roll20 early.** In week 2, write a hand-made .dd2vtt for one test map and upload it, so the writer is proven before the model exists.
+**Check it in Roll20 early.** In week 2, write a hand-made .dd2vtt for one test map and upload it, so the writer is proven before the model exists. Include one light of each tier, to see how Roll20 turns `range` and `intensity` into bright and dim light.
 
 ## Evaluation
 
@@ -139,11 +145,12 @@ The headline result: trained model vs. a classical baseline on the same test set
 | Pixel | IoU and F1 per class | Standard segmentation quality |
 | Boundary | Wall F1 with a tolerance of \~0.1 square | Fair to thin structures; a wall 2 px off is not wrong |
 | Gameplay | Visibility IoU (below) | Whether fog of war behaves correctly |
+| Objects | Light F1 (a predicted light matches a true one within 0.5 squares) and tier accuracy on matched lights | Whether light sources are found and sized right |
 | Practical | Minutes of manual fixing in Roll20 per map | What a GM actually saves |
 
 **Visibility IoU.** Sample \~100 random viewpoints inside each map. For each, compute the visibility polygon with the predicted walls and with the true walls, and take their IoU. Average across viewpoints. This rewards getting the walls that matter right and punishes gaps that leak sight, even if they are only a few pixels wide.
 
-**Baseline.** Canny edges + contour → wall segments, the same approach Auto-Wall uses. Tune its thresholds once on the validation set, then freeze it.
+**Baseline.** Canny edges + contour → wall segments, the same approach Auto-Wall uses. Tune its thresholds once on the validation set, then freeze it. It predicts no portals and no lights.
 
 **Reporting.** Results on two test splits: the in-domain set (Dungeondraft-like) and the hard set (outdoor, photoreal, like the snowy camp map). Include a gallery of failure cases with a sentence on each.
 
@@ -171,12 +178,12 @@ The presentation shows how the model was trained and validated, not just the fin
 
 Each row is one trained model; together they cover the baseline and the data ablation.
 
-| Model | Wall IoU | Portal IoU | Wall boundary F1 | Visibility IoU | Fix time (min/map) |
-| --- | --- | --- | --- | --- | --- |
-| Canny baseline |  |  |  |  |  |
-| U-Net, real only |  |  |  |  |  |
-| U-Net, synthetic only |  |  |  |  |  |
-| U-Net, synthetic → real |  |  |  |  |  |
+| Model | Wall IoU | Portal IoU | Wall boundary F1 | Visibility IoU | Light F1 | Tier acc. | Fix time (min/map) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Canny baseline |  |  |  |  | 0 | - |  |
+| U-Net, real only |  |  |  |  |  |  |  |
+| U-Net, synthetic only |  |  |  |  |  |  |  |
+| U-Net, synthetic → real |  |  |  |  |  |  |  |
 
 Log every run (MLflow or Weights & Biases) so the curves and tables export directly into the slides.
 
@@ -184,8 +191,8 @@ Log every run (MLflow or Weights & Biases) so the curves and tables export direc
 
 A small web app is enough: upload, preview, download. Keep it thin so the time goes into the model.
 
-- **Backend:** FastAPI. `POST /analyze` takes the image (+ optional squares-across), returns the .dd2vtt plus a preview PNG with walls overlaid in color.
-- **Frontend:** Gradio, so the whole project stays in Python: upload, the overlay preview, a download button.
+- **Backend:** FastAPI. `POST /analyze` takes the image (+ optional squares-across), returns the .dd2vtt plus a preview PNG with walls, portals and lights overlaid in color.
+- **Frontend:** Gradio, so the whole project stays in Python: upload, the overlay preview, the light tier table (bright and dim per tier, pre-filled, editable), a download button.
 - **Model serving:** export to ONNX for CPU inference; a 256-tile U-Net runs fast enough without a GPU.
 - **Packaging:** everything runs on the laptop under Docker, on an Ubuntu 24.04 base image. One image covers data generation, training and the web app, started with Docker Compose. Install the CPU-only PyTorch build (much smaller, no CUDA). Mount the datasets, checkpoints and run logs as volumes so they persist outside the container and can be showcased. Give Docker enough CPU cores and RAM (Docker Desktop caps both by default). To use an Intel GPU from a container, pass the host's /dev/dri device through. Optional: push the same image to a cloud service for session 30 (Cloud Deployment, 07.12).
 - **Observability:** log inference time, map size and wall count per request. Lines up with sessions 29 and 31.
@@ -199,13 +206,13 @@ The plan front-loads data and the end-to-end path, so a working (if rough) Roll2
 
 **Week by week:**
 
-1. **20–26.10:** Confirm course requirements. Write labeling rules. Build the .dd2vtt → mask rasterizer. Set up the repo and Docker. Make 3 Dungeondraft maps (25×25, Roll20 grid preset). Upload a hand-made .dd2vtt to Roll20 to prove the format.
-2. **27.10–2.11:** Synthetic generator v1. Canny baseline. Evaluation harness (pixel IoU, boundary F1). 5 more Dungeondraft maps.
+1. **20–26.10:** Confirm course requirements. Write labeling rules (lights added 21.10). Build the .dd2vtt → mask rasterizer. Set up the repo and Docker. Make 3 Dungeondraft maps (25×25, Roll20 grid preset). Upload a hand-made .dd2vtt to Roll20 to prove the format.
+2. **27.10–2.11:** Synthetic generator v1 (with lights). Light labels in the rasterizer, if not done in week 1. Canny baseline. Evaluation harness (pixel IoU, boundary F1). 5 more Dungeondraft maps; re-export `dd01`–`dd03` with lights; check how Roll20 imports lights.
 3. **3–9.11:** First U-Net trained on synthetic data; tune augmentation. 5 more Dungeondraft maps. Start hand-labeling the test set.
 4. **10–16.11:** Fine-tune on Dungeondraft maps. Vectorization v1 and the .dd2vtt writer.
 5. **17–23.11:** First end-to-end run: map → model → .dd2vtt → Roll20. Add the visibility IoU metric. **Milestone: first Roll20 import.**
-6. **24–30.11:** Ablations. Grid detection. Finalize the test set (10–15 maps, including the hard set).
-7. **1–7.12:** Gradio app, Docker Compose run on the laptop, optional cloud deploy (session 30 on 07.12). **Feature freeze 07.12.**
+6. **24–30.11:** Ablations. Grid detection. Light post-processing and light metrics. Finalize the test set (10–15 maps, including the hard set).
+7. **1–7.12:** Gradio app (with the light tier table), Docker Compose run on the laptop, optional cloud deploy (session 30 on 07.12). **Feature freeze 07.12.**
 8. **8–14.12:** Error analysis, failure gallery, model card. Use the workshop session (14.12) for feedback.
 9. **15–23.12:** Slides, demo video, rehearsal. **Final presentation 23.12.**
 
@@ -216,6 +223,8 @@ The plan front-loads data and the end-to-end path, so a working (if rough) Roll2
 | Synthetic maps look too different from real ones; model doesn't transfer | Medium | Heavy augmentation; fine-tune on Dungeondraft; report the synthetic-vs-real ablation either way |
 | Vectorization produces broken or jagged walls | High | Start it in week 4, not week 7; snap to axes; tune on validation maps |
 | Doors and windows indistinguishable in the export | Medium | Decided: one portal class only |
+| Lights too rare or too varied to learn well; tier read wrong | Medium | Biased crops and class weights; tier from blob size, values editable in the app; lights are cut first if time runs short, walls and portals are never cut for them |
+| Roll20 reads .dd2vtt light fields differently than expected | Medium | Checked by hand in week 2 with one light per tier, before any light code is written |
 | Not enough Dungeondraft maps | Medium | Rely more on synthetic data; 10 layouts × 3 variants is still usable |
 | Grid detection fails on gridless maps | High | User-entered size is the default fallback, not an error |
 | Time pressure in December (deployment and write-up compete) | Medium | Feature freeze on 07.12; the last two weeks are polish and writing only |

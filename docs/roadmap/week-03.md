@@ -18,14 +18,14 @@ scored on the validation split against the Canny baseline. All training settings
 
 | File | What |
 | --- | --- |
-| `train/dataset.py` | Reads the manifest; loads the 32 px training copies; samples 2,000 biased 256×256 crops per epoch (50% on walls, 25% on portals, 25% anywhere; see training.md §2). |
+| `train/dataset.py` | Reads the manifest; loads the 32 px training copies; samples 2,000 biased 256×256 crops per epoch (45% on walls, 20% on portals, 10% on lights, 25% anywhere; see training.md §2). |
 | `train/augment.py` | Flips, 90° rotations, color jitter, hue shift, blur, JPEG noise. Geometric changes go to image and mask together; color changes go to the image only. |
-| `train/model.py` | `smp.Unet("resnet18", classes=3)`, channels-last; device = XPU if `torch.xpu.is_available()`, else CPU; `torch.set_num_threads(6)`. |
-| `train/losses.py` | Cross-entropy + Dice, class weights computed from the training split's pixel shares in the manifest. |
-| `train/train.py` | Seeded training loop: frozen encoder for the first epochs, then unfreeze; validation each epoch (loss, wall IoU, boundary F1); best checkpoint by validation boundary F1 to `runs/<run>/`; everything logged to MLflow with the config. Saves sample predictions at early, middle and final epochs. |
+| `train/model.py` | `smp.Unet("resnet18", classes=4)`, channels-last; device = XPU if `torch.xpu.is_available()`, else CPU; `torch.set_num_threads(6)`. |
+| `train/losses.py` | Cross-entropy + Dice (Dice over wall, portal and light), class weights computed from the training split's pixel shares in the manifest. |
+| `train/train.py` | Seeded training loop: frozen encoder for the first epochs, then unfreeze; validation each epoch (loss, wall, portal and light IoU, boundary F1); best checkpoint by validation boundary F1 to `runs/<run>/`; everything logged to MLflow with the config. Saves sample predictions at early, middle and final epochs. |
 | `train/configs/stage1_synthetic.toml` | Stage 1 settings: data, epochs, learning rates, freeze schedule, seed. |
 | `data/attach_image.py` | Replace a .dd2vtt's embedded image with the original test image; set `pixels_per_grid` = image width / `map_size.x`; refuse images that aren't `map_size` × a whole px per square. For the hand-traced test set. |
-| `tests/test_dataset.py` | Crops are 256×256, masks hold only 0–2, rescaling keeps walls in place. |
+| `tests/test_dataset.py` | Crops are 256×256, masks hold only 0–3, rescaling keeps walls and lights in place. |
 | `tests/test_train_smoke.py` | Two training steps on the demo map run without error and lower the loss. |
 | `tests/test_attach_image.py` | Size check rejects a wrong-sized image; output loads with `load_uvtt`. |
 

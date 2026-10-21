@@ -8,9 +8,10 @@ turns out to be wrong, change it here first, then regenerate the affected masks.
 
 | Id | Class | Meaning |
 | --- | --- | --- |
-| 0 | background | Everything else: floor, terrain, furniture, open gaps |
+| 0 | background | Everything else: floor, terrain, furniture, open gaps, unlit light fixtures |
 | 1 | wall | Blocks both sight and movement |
 | 2 | portal | A door or window set in a wall |
+| 3 | light | A lit light source drawn in the image |
 
 There is one portal class for doors and windows. Universal VTT portals have no door/window type,
 and Roll20 imports every portal as a door, so the GM switches the few windows by hand.
@@ -48,6 +49,42 @@ A portal is a door or window **set in a wall**.
 - Secret doors and traps. They are not visible in the image by design.
 - Stairs, ladders and trapdoors: they connect floors, not rooms on one floor.
 
+## Light (class 3)
+
+A light is a **lit light source drawn in the image**: you can see the flame or the lamp.
+
+There is one light class. How bright a light is cannot be read from the image (the same torch
+sprite could be 20 ft or 40 ft of light), so each light gets a **size tier** instead, and the
+brightness comes from a fixed table. The GM can change the values in the app before download.
+
+| Tier | Examples | Label disc radius | Bright / dim (squares) | `range` in the .dd2vtt |
+| --- | --- | --- | --- | --- |
+| small | candle, candelabra, torch, wall sconce | 0.25 squares | 4 / 4 (torch: 20 ft + 20 ft) | 8 |
+| medium | lantern, brazier, campfire, lit fireplace | 0.40 squares | 6 / 6 (lantern: 30 ft + 30 ft) | 12 |
+| large | bonfire, large fire pit, forge | 0.60 squares | 8 / 8 (project choice) | 16 |
+
+- The bright and dim values follow D&D 5e where it has one (torch, lantern); the large tier is a
+  project choice. The table lives in `postprocess/configs/lights.toml` once the code exists; this
+  page and that file must agree.
+- How Roll20 turns a .dd2vtt light's `range` and `intensity` into bright and dim light is checked
+  by hand in week 2. The `range` column and the writer follow what that check finds.
+- **Tier comes from `range`.** When you place a light in Dungeondraft, set its range to the
+  tier's value in the last column. The rasterizer reads the tier back from `range` and stops with
+  an error on a range that matches no tier, so a light placed with the default range is caught.
+- **Position:** the center of the flame or lamp. A **wall-mounted** light (torch, sconce) goes on
+  the room side of the wall, just off it, never on the wall's centerline. On the centerline its
+  disc would be split by the wall band into two blobs, and Roll20 could not tell which side it
+  lights.
+- Color, intensity and shadows are not labeled. Leave Dungeondraft's defaults.
+
+**Not lights:**
+
+- Unlit torches, empty braziers, cold fireplaces.
+- Glow with no drawn source: ambient lighting, colored tints, light pools from off-map sources.
+- Lava, glowing water, magic circles, crystals and other things that glow but are not a lamp or
+  a fire. They go in the edge cases log if a map needs a decision.
+- Windows letting in daylight: they are portals, not lights.
+
 ## How labels are drawn
 
 Labels come **only** from `.dd2vtt` files (`data/rasterize.py`). Never use `.dungeondraft_map`
@@ -57,6 +94,10 @@ source files.
   squares** wide along the centerline.
 - Portals are their `bounds` segment, drawn **0.30 squares** wide, on top of the walls. This way a
   portal always wins over the wall it sits in.
+- Lights are a filled disc at `position`, with the radius of their tier (0.25, 0.40 or 0.60
+  squares), drawn **first**, so walls and portals are drawn over them. A wall must never get a
+  gap from a torch next to it; losing part of a small light's disc is harmless.
+- Draw order: lights, then walls, then portals.
 - **Label width is fixed, whatever the drawn wall width.** A .dd2vtt only stores centerlines, and
   post-processing skeletonizes the mask back to centerlines anyway. A consistent band is an easier
   target than one that changes with the art style. The images still have to show many wall
@@ -73,11 +114,20 @@ source files.
   `dd01_a.dd2vtt` ... `dd01_d.dd2vtt`. All variants of one layout always go in the same split.
 - **Content:** walls, doors, windows, at least one doorless opening, and a scatter of furniture as
   distractors. No detailing needed.
+- **Lights:** at least 3 lit light sources per layout, covering at least two tiers (for example
+  wall torches plus a brazier or a campfire). Place the sprite, then a Dungeondraft light on it
+  with the tier's `range` (see "Light (class 3)"). A light object with no drawn sprite is not
+  allowed: the model can only learn what it can see. Add a few unlit fixtures too, as
+  distractors. Lights are the same in all variants of a layout.
+- **Light glow:** if the export draws Dungeondraft's light glow into the image, vary the lighting
+  across variants, so the model learns the sprite and not only the glow (third-party maps often
+  have no glow).
 - **Shadows:** do not turn on shadow casting for furniture or other objects. Dungeondraft exports
   shadow-casting objects to `objects_line_of_sight`, which the rasterizer labels as walls, so a
   shadow-casting table would become a wall in the mask.
 - **Check every export:** run `python -m data.rasterize <map>.dd2vtt` and look at the
-  `_preview.jpg`. Red must cover only walls and magenta only doors and windows.
+  `_preview.jpg`. Red must cover only walls, magenta only doors and windows, and the light discs
+  only lit light sources, at the right tier size.
 
 ## Hand-tracing the test set
 
@@ -87,6 +137,7 @@ and saved as .dd2vtt. The same rules apply:
 - Trace each wall along its **centerline**, as one polyline per continuous run of wall.
 - End the wall at each side of a doorless opening, so the gap stays open.
 - Place each door or window as a portal across the wall, with its `bounds` from jamb to jamb.
+- Place a light on each lit light source, with its tier's `range`, as for Dungeondraft maps.
 - Check the trace with the rasterizer preview, the same way as Dungeondraft maps.
 - Published third-party maps stay in the test set only and are never redistributed.
 
@@ -100,15 +151,17 @@ and saved as .dd2vtt. The same rules apply:
    overlay and scale it so one image square equals one Dungeondraft square, corners aligned.
 4. **Trace.** Walls with the wall tool along the drawn walls' centerlines, ending at each side of
    a doorless opening. Doors and windows as portals in those walls. Use the cave or free-form
-   tools for cliffs and cave walls. No objects, no lights, no shadows.
+   tools for cliffs and cave walls. Lights on the lit light sources, with the tier's range. No
+   objects, no shadows.
 5. **Export** Universal VTT as `tNN.dd2vtt`. Its embedded image is Dungeondraft's rendering,
    not the test image.
 6. **Swap the image:** `python -m data.attach_image data/raw/test/tNN.dd2vtt data/raw/test/tNN.jpg`
    embeds the original image and sets `pixels_per_grid` from its size. It refuses an image whose
    size isn't `map_size` × a whole px per square.
 7. **Check:** `python -m data.rasterize data/raw/test/tNN.dd2vtt`. In the preview, red must sit
-   on the drawn walls of the original image and magenta on its doors and windows. If everything
-   is shifted the same way, the overlay was misaligned in step 3.
+   on the drawn walls of the original image, magenta on its doors and windows, and the light
+   discs on its lit light sources. If everything is shifted the same way, the overlay was
+   misaligned in step 3.
 
 ## Edge cases log
 
@@ -120,3 +173,4 @@ apply it everywhere.
 | Door flagged `freestanding` but sitting in a wall | Portal | `demo-training-map` |
 | Glass window drawn as a thin plain line in the wall | Portal; subtle but visible | `dd03` (right-hand room) |
 | Several portals stacked at the same position | One portal; the mask is the same either way. Deduplicate before counting portals or writing a .dd2vtt | `dd01_a`, `dd01_b` |
+| Several lights stacked on one sprite | One light, with the largest tier. Deduplicate (within 0.25 squares) before drawing | - |

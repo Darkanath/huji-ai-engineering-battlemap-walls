@@ -14,11 +14,11 @@ with ONNX Runtime on CPU, in the same Docker image. No new features after 07.12.
 | --- | --- |
 | `train/export_onnx.py` | Export the chosen checkpoint to `runs/<run>/model.onnx`; check ONNX and PyTorch outputs match on the demo map. |
 | `train/predict.py` | Add an ONNX Runtime backend next to the PyTorch one. |
-| `app/app.py` | Gradio UI: image upload (`.png`, `.jpg`/`.jpeg`, `.webp`), map width in squares pre-filled with 25 (used when no grid is found), overlay preview, .dd2vtt download. |
-| `app/request_log.py` | Per request: inference time, map size, wall and portal count, to a log file under `runs/`. |
+| `app/app.py` | Gradio UI: image upload (`.png`, `.jpg`/`.jpeg`, `.webp`), map width in squares pre-filled with 25 (used when no grid is found), overlay preview (walls, portals, lights as circles colored by tier), light tier table (bright and dim per tier, pre-filled from `lights.toml`, editable), .dd2vtt download. |
+| `app/request_log.py` | Per request: inference time, map size, wall, portal and light count, to a log file under `runs/`. |
 | `docker-compose.yml` | Default command starts the app on port 7860. |
 | `tests/test_onnx.py` | ONNX and PyTorch predictions agree on the demo map. |
-| `tests/test_app.py` | The app's predict function returns a preview image and a valid .dd2vtt. |
+| `tests/test_app.py` | The app's predict function returns a preview image and a valid .dd2vtt; an edited tier table changes the written `range`. |
 
 FastAPI stays optional: add it only if the cloud deployment needs a plain API.
 

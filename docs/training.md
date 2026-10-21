@@ -18,7 +18,9 @@ How every model in this project is trained, validated and selected. The week-by-
 That makes 5–6 trained runs in total. The list is fixed now; nothing gets added later.
 
 **Network:** `smp.Unet(encoder_name="resnet18", encoder_weights="imagenet", in_channels=3,
-classes=3)`, about 14 M parameters. It outputs logits for 0 background, 1 wall, 2 portal.
+classes=4)`, about 14 M parameters. It outputs logits for 0 background, 1 wall, 2 portal,
+3 light. Every run, from R1 on, uses all 4 classes: adding lights later would mean retraining
+every run. Lights do not change checkpoint selection (§6).
 Inputs are RGB normalized with ImageNet mean and std, to match the pretrained encoder.
 
 ## 2. Data
@@ -44,7 +46,8 @@ The manifest step also writes a training copy of every map into
 - **Image:** the embedded image resized to 32 px per square (area interpolation), saved as JPEG
   (quality 95). A 25×25 map becomes 800×800 px.
 - **Mask:** rasterized **directly** from the .dd2vtt at 32 px per square, not resized from the
-  70 px mask, so thin portals keep their exact shape. Walls are 8 px wide and portals 10 px.
+  70 px mask, so thin portals keep their exact shape. Walls are 8 px wide and portals 10 px;
+  light discs have a radius of 8, 13 or 19 px (small, medium, large tier).
 
 R4 (no scale normalization) uses the 70 px copies instead.
 
@@ -52,8 +55,10 @@ R4 (no scale normalization) uses the 70 px copies instead.
 
 - Each epoch draws **2,000 random 256×256 crops** (8×8 squares) from the training maps. Every
   map gets the same number of crops, whatever its size.
-- **Biased crops:** 50% are centered on a random wall pixel, 25% on a random portal pixel, 25%
-  anywhere. Without this, portals (under 1% of pixels) would be missing from most crops.
+- **Biased crops:** 45% are centered on a random wall pixel, 20% on a random portal pixel, 10% on
+  a random light pixel, 25% anywhere. Without this, portals (under 1% of pixels) and lights (about
+  0.1–0.3% *(estimate)*) would be missing from most crops. A map with no lights gives its light
+  share to the random crops.
 - The sampling is seeded with `seed + epoch`, so a run can be repeated exactly.
 - The class shares of the sampled crops are logged every epoch, to check the bias.
 
@@ -89,11 +94,11 @@ the image only.
 - **Weighted cross-entropy:** class weight `w_c = 1 / sqrt(share_c)`, normalized so background is
   1 and capped at 20. Shares come from the **training split of the current stage** in the
   manifest (not from the biased crops). With today's Dungeondraft shares (about 94% / 5.3% /
-  0.5%) this gives roughly 1 / 4.2 / 13.7.
-- **Dice:** soft multi-class Dice on the softmax, averaged over wall and portal only. Background
+  0.5%) this gives roughly 1 / 4.2 / 13.7; lights at about 0.2% *(estimate)* hit the cap of 20.
+- **Dice:** soft multi-class Dice on the softmax, averaged over wall, portal and light. Background
   is left out, because its Dice is always near 1 and adds nothing.
-- If portal IoU stays low after stage 2, the one planned change is focal loss in place of
-  weighted CE. Any change gets its own MLflow run, so it shows up in the report.
+- If portal or light IoU stays low after stage 2, the one planned change is focal loss in place
+  of weighted CE. Any change gets its own MLflow run, so it shows up in the report.
 
 ## 5. Optimization
 
@@ -122,8 +127,10 @@ Run at the end of every epoch, on **whole maps**, not crops:
   windows overlap; class = argmax. This is the same code (`train/predict.py`) the app uses.
 - **Validation sets:** Dungeondraft val for every run (the target domain), plus synthetic val in
   stage 1. Both are logged; **selection uses Dungeondraft val only.**
-- **Metrics each epoch:** validation loss; pixel IoU and F1 for wall and portal; wall boundary F1
-  with a tolerance of 3 px (0.1 square at 32 px per square).
+- **Metrics each epoch:** validation loss; pixel IoU and F1 for wall, portal and light; wall
+  boundary F1 with a tolerance of 3 px (0.1 square at 32 px per square).
+- **Light F1 and tier accuracy** need the light post-processing (`postprocess/lights.py`, week 6),
+  so they run on the selected checkpoint of each run, like visibility IoU.
 - **Visibility IoU** is slower, so it runs only on the selected checkpoint (from week 5).
 - **Checkpoint selection:** the best epoch by **Dungeondraft val wall boundary F1**. Ties go to the
   higher portal IoU. `best.pt` and `last.pt` are both kept.
@@ -133,7 +140,8 @@ Run at the end of every epoch, on **whole maps**, not crops:
 ## 7. Canny baseline (R0)
 
 - Pipeline: grayscale -> Gaussian blur -> Canny -> morphological close -> keep contours longer
-  than a minimum length -> draw them as 8 px walls. It predicts no portals (portal IoU is 0).
+  than a minimum length -> draw them as 8 px walls. It predicts no portals and no lights (portal
+  and light IoU are 0).
 - Tuning: a grid search over blur kernel, the two Canny thresholds, the close kernel and the
   minimum length, on **Dungeondraft val**, maximizing wall boundary F1. The best values are
   frozen in `eval/configs/baseline_canny.toml` and never changed after week 2.
@@ -191,7 +199,7 @@ select_on = "dungeondraft"
 px_per_square = 32
 crop_size = 256
 crops_per_epoch = 2000
-crop_bias = { wall = 0.5, portal = 0.25, random = 0.25 }
+crop_bias = { wall = 0.45, portal = 0.2, light = 0.1, random = 0.25 }
 
 [model]
 arch = "unet"
@@ -239,13 +247,14 @@ bf16 = false
 | `train/losses.py` | Weighted CE + Dice, class weights from the manifest |
 | `train/train.py` | Training loop, validation, checkpoints, MLflow |
 | `train/predict.py` | Sliding-window inference (validation and the app) |
-| `eval/metrics.py` | IoU, F1, boundary F1 |
+| `eval/metrics.py` | IoU, F1, boundary F1, light F1 and tier accuracy |
 | `eval/baseline_canny.py` | R0 |
 | `train/configs/*.toml` | One config per run |
 
 ## 13. What goes into the report
 
-- **Data summary:** maps, crops and class shares per split, from the manifest.
+- **Data summary:** maps, crops and class shares per split, from the manifest, plus light counts
+  per tier.
 - **Training curves:** training and validation loss and validation wall IoU per epoch for stage 1
   and stage 2, with the chosen checkpoint marked.
 - **Learning progression:** the 6 fixed validation maps at the first, middle and final epoch.

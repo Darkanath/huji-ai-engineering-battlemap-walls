@@ -15,7 +15,7 @@
 | `eval/failure_gallery.py` | The worst test predictions by visibility IoU: image, ground truth and prediction side by side, saved as figures. |
 | `notebooks/figures.ipynb` | Final figures: data summary, curves, learning progression, results tables, contact sheets. |
 | `docs/results.md` | Final results tables (in-domain, hard), ablations, fix times, failure gallery with one line per failure. |
-| `docs/model-card.md` | Model, training data and licensing, metrics, intended use, limitations (outdoor, photoreal, hex grids, multi-floor). |
+| `docs/model-card.md` | Model, training data and licensing, metrics, intended use, limitations (outdoor, photoreal, hex grids, multi-floor; light brightness comes from a tier table, not from the image). |
 
 ## Run
 
