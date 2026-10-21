@@ -43,7 +43,7 @@ Week-by-week tasks, file names and done criteria: `docs/roadmap/week-NN.md` (ind
 ## Repo layout
 
 ```
-data/            generator.py (synthetic maps), rasterize.py (.dd2vtt -> mask), manifest tools,
+data/            generator.py + synth/ (synthetic maps), rasterize.py (.dd2vtt -> mask), manifest.py,
                  retier_lights.py + configs/light_sources.toml (Dungeon Alchemist lights -> tiers)
   raw/           source .dd2vtt files (dungeondraft/, dungeon_alchemist/, synthetic/, test/)
                  [gitignored]; Dungeon Alchemist exports keep their originals in original/ and

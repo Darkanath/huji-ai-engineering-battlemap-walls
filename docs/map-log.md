@@ -6,8 +6,10 @@ Alchemist maps in `data/raw/dungeon_alchemist/` (both gitignored), named
 of one layout always go in the same split. What each new layout should contain is in
 [map-specs.md](map-specs.md).
 
-This log keeps what the file names leave out, for the data summary and the error analysis. The
-manifest CSV (week 2) will take it over.
+This log keeps what the file names leave out, for the data summary and the error analysis. Splits
+are in `data/processed/manifest.csv` (`python -m data.manifest`). The first build (21.10) put
+`dd01` in train, `dd02` in test and `dd03` in val, and `da01` in train; splits never change after
+that.
 
 ## Dungeondraft maps
 

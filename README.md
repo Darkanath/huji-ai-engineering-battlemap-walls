@@ -23,7 +23,8 @@ Week 1 of 9 (final presentation 2026-12-23).
 
 - [x] Repo layout, Docker setup
 - [x] `.dd2vtt` -> class mask rasterizer, with tests
-- [ ] Synthetic map generator, Canny baseline, evaluation harness
+- [x] Synthetic map generator and dataset manifest (splits, 70 px and 32 px copies)
+- [ ] Canny baseline, evaluation harness
 - [ ] U-Net training (synthetic, then fine-tuning on the real maps)
 - [x] Light labels in the rasterizer
 - [x] Dungeon Alchemist pilot (`da01`) and its light conversion (`data/retier_lights.py`)
@@ -52,6 +53,14 @@ docker compose run --rm app python -m data.rasterize \
 Mask classes: `0` background, `1` wall, `2` portal, `3` light. Masks are always PNG so class ids
 stay exact.
 
+Generate synthetic maps and build every dataset (splits, masks, 32 px training copies,
+`data/processed/manifest.csv`):
+
+```bash
+docker compose run --rm app python -m data.generator --count 20
+docker compose run --rm app python -m data.manifest
+```
+
 Dungeon Alchemist exports set light ranges per asset, not by tier. Map them to the tiers first
 (the originals in `original/` are never changed):
 
@@ -63,8 +72,9 @@ docker compose run --rm app python -m data.retier_lights --source dungeon_alchem
 ## Repo layout
 
 ```
-data/            rasterize.py (.dd2vtt -> mask), retier_lights.py (other tools' lights -> tiers),
-                 configs/; later the synthetic generator and manifests
+data/            rasterize.py (.dd2vtt -> mask), generator.py + synth/ (synthetic maps),
+                 manifest.py (splits, processed copies), retier_lights.py (other tools' lights ->
+                 tiers), configs/
   raw/           source .dd2vtt files: dungeondraft/, dungeon_alchemist/, synthetic/, test/
                  (gitignored, except the demo map used by the tests)
   processed/     image + mask pairs, manifest.csv (gitignored)

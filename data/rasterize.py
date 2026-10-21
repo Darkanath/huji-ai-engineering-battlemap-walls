@@ -58,15 +58,16 @@ def map_size_px(uvtt: dict, ppg: int = DEFAULT_PPG) -> tuple[int, int]:
     return round(size["x"] * ppg), round(size["y"] * ppg)
 
 
-def decode_image(uvtt: dict, ppg: int = DEFAULT_PPG) -> Image.Image:
+def decode_image(uvtt: dict, ppg: int = DEFAULT_PPG, resample: int = Image.LANCZOS) -> Image.Image:
     """Decode the embedded map image and rescale it to `ppg` pixels per grid square.
 
     The embedded image is the source of truth, whatever its own `pixels_per_grid`.
-    It may be PNG or JPEG; Pillow detects the format from the bytes.
+    It may be PNG or JPEG; Pillow detects the format from the bytes. `resample` is the
+    Pillow filter used when the size changes (Image.BOX averages areas, for downscaling).
     """
     image = Image.open(io.BytesIO(base64.b64decode(uvtt["image"]))).convert("RGB")
     size = map_size_px(uvtt, ppg)
-    return image if image.size == size else image.resize(size, Image.LANCZOS)
+    return image if image.size == size else image.resize(size, resample)
 
 
 def light_tier(light_range: float) -> str:

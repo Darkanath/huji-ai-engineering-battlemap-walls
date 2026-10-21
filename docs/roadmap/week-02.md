@@ -11,21 +11,22 @@ maps can be generated; predictions can be scored; the classical baseline has a f
       light imports (bright and dim radius from `range` and `intensity`) in
       `docs/labeling-rules.md`. Also check that `range` in the .dd2vtt is in grid squares. Do this
       before finishing the other layouts: if the unit is wrong, every light's range changes.
-- [ ] Pick a small set of CC0 textures (floors, walls), furniture sprites and light source
-      sprites (torch, candle, lantern, brazier, campfire, bonfire; lit and unlit) for the generator and
-      put them in `data/assets/` with a `SOURCES.md` listing where each came from. Only CC0 or
-      your own work.
+- [ ] *(optional)* Pick a small set of CC0 textures (floors, walls), furniture sprites and light
+      source sprites (torch, candle, lantern, brazier, campfire, bonfire; lit and unlit) and put
+      them in `data/assets/` with a `SOURCES.md` listing where each came from. Only CC0 or your
+      own work. The generator v1 draws everything procedurally, so it doesn't need them; assets
+      would only make synthetic maps look more like real ones.
 - [ ] If the Roll20 upload from week 1 is not done yet, do it now.
 
 ## Code
 
 | File | What |
 | --- | --- |
-| `data/manifest.py` | Scan the top level of `data/raw/<dataset>/` (not `original/` subfolders), read layout and variant from `<layout>_<variant>`, assign splits by layout with a fixed seed, per dataset (Dungeondraft and Dungeon Alchemist each 70/15/15 with at least one layout in val and in test, synthetic 90/10, `test/` always test), rasterize every map into `data/processed/<dataset>/` at 70 px and write the 32 px training copies into `data/processed/<dataset>/32px/` (training.md §2), write `data/processed/manifest.csv` (dataset, map, layout, variant, split, seed, pixel shares including light, light count per tier). Re-running it keeps existing splits. |
-| `tests/test_manifest.py` | Variants of a layout share a split; files in `original/` are skipped; same seed gives the same splits; CSV columns and shares are right. |
-| `data/generator.py` | Synthetic map generator (PLAN.md steps 1–7): rooms and corridors, doorless gaps of 1–3 squares, walls of varying width and color, doors and windows, light sprites of all three tiers with their `lights` entries (wall lights on the room side), unlit fixtures as distractors, furniture distractors, optional grid, tint, blur and JPEG noise. Writes `data/raw/synthetic/syn0001.dd2vtt` (embedded PNG image), one seed per map. Default 25×25 squares at 70 px. |
-| `data/configs/generator.toml` | Generator settings: counts, wall width range, gap, furniture and light probabilities, lights per map and tier mix. |
-| `tests/test_generator.py` | Same seed gives the same file; output loads with `load_uvtt`; rasterized mask has walls, portals, lights and at least one gap; every light's `range` is a tier value; shares in a sane range. |
+| `data/manifest.py` *(done)* | Scan the top level of `data/raw/<dataset>/` (not `original/` subfolders), read layout and variant from `<layout>_<variant>`, assign splits by layout with a fixed seed, per dataset (Dungeondraft and Dungeon Alchemist each 70/15/15 with at least one layout in val and in test, synthetic 90/10, `test/` always test), rasterize every map into `data/processed/<dataset>/` at 70 px and write the 32 px training copies into `data/processed/<dataset>/32px/` (training.md §2), write `data/processed/manifest.csv` (dataset, map, layout, variant, split, seed, pixel shares including light, light count per tier). Re-running it keeps existing splits. |
+| `tests/test_manifest.py` *(done)* | Variants of a layout share a split; files in `original/` are skipped; same seed gives the same splits; CSV columns and shares are right. |
+| `data/generator.py` + `data/synth/` *(done)* | Synthetic map generator (PLAN.md steps 1–7): rooms and corridors, doorless gaps of 1–3 squares, walls of varying width and color, doors and windows, light sprites of all three tiers with their `lights` entries (wall lights on the room side), unlit fixtures as distractors, furniture distractors, optional grid, tint, blur and JPEG noise. Writes `data/raw/synthetic/syn0001.dd2vtt` (embedded PNG image), one seed per map. Default 25×25 squares at 70 px. |
+| `data/configs/generator.toml` *(done)* | Generator settings: counts, wall width range, gap, furniture and light probabilities, lights per map and tier mix. |
+| `tests/test_generator.py` *(done)* | Same seed gives the same file; output loads with `load_uvtt`; rasterized mask has walls, portals, lights and at least one gap; every light's `range` is a tier value; shares in a sane range. |
 | `eval/metrics.py` | Pixel IoU and F1 per class (light included); wall boundary F1 with a 0.1-square tolerance. Light F1 and tier accuracy come in week 6. |
 | `tests/test_metrics.py` | Perfect prediction scores 1; empty prediction scores 0; a 2 px shift still scores high on boundary F1. |
 | `eval/baseline_canny.py` | Canny edges + contours -> wall mask, with thresholds read from a config. |
@@ -44,8 +45,9 @@ docker compose run --rm app pytest
 
 ## Done when
 
-- [ ] 20 synthetic maps generated; their previews look right by the labeling rules, lights included.
-- [ ] `manifest.csv` lists the demo, all Dungeondraft, Dungeon Alchemist and synthetic maps with splits.
+- [x] 20 synthetic maps generated; their previews look right by the labeling rules, lights included
+      (contact sheet checked 21.10; walls are axis-aligned only in v1).
+- [x] `manifest.csv` lists the demo, all Dungeondraft, Dungeon Alchemist and synthetic maps with splits.
 - [ ] Canny baseline tuned on validation, config frozen, validation scores saved.
 - [ ] All tests pass.
 

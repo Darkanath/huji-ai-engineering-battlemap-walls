@@ -62,14 +62,16 @@ Build this first; every dataset depends on it. It reads a .dd2vtt, draws each `l
 ### Synthetic generator
 
 1. Random rooms-and-corridors layout on a 25×25-square grid by default (BSP split or random placement). Leave some walls open: gaps of 1–3 squares with no door, so the model learns that an opening is not a broken wall.
-2. Render floors and walls with CC0 textures; vary wall thickness, color and outline.
+2. Render floors and walls with procedural textures (planks, tiles, checkerboards, stone; CC0 textures can be added later); vary wall thickness, color and outline.
 3. Place doors and windows on wall segments.
 4. Place light source sprites (torches on walls, braziers, campfires, bonfires), each with a light of its tier's `range`, plus some unlit fixtures as distractors.
 5. Scatter furniture sprites as distractors: tables, beds, barrels, rugs. This teaches the model what is *not* a wall.
 6. Optional overlays: grid lines, lighting tint, blur, JPEG noise.
 7. Save each map's image and its .dd2vtt together, written by the same script. The generator decided where every wall, portal and light goes, so the labels cost nothing and are exact; no manual work per map. The same rasterizer then handles synthetic and real data alike.
 
-**Volume and storage.** Rendering one map takes about a second, so 500 maps is a few minutes on a laptop. At 70 px per square (Roll20's default; export Dungeondraft maps with its Roll20 grid preset), the default 25×25-square map is a 1750×1750 image, stored as JPEG (quality 90) at about 0.6 MB; masks stay PNG because JPEG would corrupt the class ids. With its .dd2vtt (which embeds the image again) and mask, that is about 3 MB per map, so 500 maps is about 1.5 GB. If the ablation shows more synthetic data helps, generate more to disk the same way. Every dataset is saved to disk, never generated on the fly, so it can be showcased and reproduced: each map keeps its image, .dd2vtt and mask, with a fixed random seed, and a manifest (CSV) lists every map's dataset, split and seed. A thumbnail contact sheet per dataset goes in the presentation.
+**Built (21.10): generator v1** (`data/generator.py`, `data/synth/`). Building-style layouts (rooms sharing walls) and dungeon-style layouts (rooms joined by corridors), every room reachable through doors and gaps; everything is drawn procedurally, so no asset files are needed. Walls are horizontal and vertical only; diagonal and curved walls come from the real maps. Measured: about 2 s and 1.9 MB per map (image embedded as PNG).
+
+**Volume and storage.** Rendering one map takes about 2 seconds, so 500 maps is about 17 minutes on the laptop. At 70 px per square (Roll20's default; export Dungeondraft maps with its Roll20 grid preset), the default 25×25-square map is a 1750×1750 image, stored as JPEG (quality 90) at about 0.6 MB; masks stay PNG because JPEG would corrupt the class ids. With its .dd2vtt (which embeds the image again) and mask, that is about 3 MB per map, so 500 maps is about 1.5 GB. If the ablation shows more synthetic data helps, generate more to disk the same way. Every dataset is saved to disk, never generated on the fly, so it can be showcased and reproduced: each map keeps its image, .dd2vtt and mask, with a fixed random seed, and a manifest (CSV) lists every map's dataset, split and seed. A thumbnail contact sheet per dataset goes in the presentation.
 
 ### Real maps: Dungeondraft and Dungeon Alchemist
 

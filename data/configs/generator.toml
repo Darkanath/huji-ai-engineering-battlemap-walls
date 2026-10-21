@@ -1,0 +1,40 @@
+# Synthetic map generator settings (data/generator.py). Map number i is generated from seed
+# `seed + i`, so any single map can be regenerated exactly. Changing a value here changes every
+# map generated afterwards: bump `version` in data/generator.py when the output changes.
+
+seed = 1000
+map_size = [25, 25]          # squares (width, height)
+pixels_per_grid = 70         # Roll20's default; datasets are stored at 70 px per square
+
+[layout]
+building_probability = 0.5   # rooms sharing walls; otherwise rooms joined by corridors
+min_leaf = 4                 # smallest BSP cell side, squares
+max_leaf = 10                # BSP cells larger than this are always split
+corridor_width = [1, 2]      # squares, inclusive range
+extra_opening_probability = 0.3   # extra door or gap between already connected regions
+gap_probability = 0.3        # an opening is a doorless gap instead of a door
+gap_width = [1, 3]           # squares, inclusive range
+double_door_probability = 0.25
+entrances = [1, 2]           # openings to the outside
+# Chance of windows on each outer wall run of 3+ squares, per layout style.
+window_probability = { building = 0.6, dungeon = 0.15 }
+
+[walls]
+width = [0.15, 0.45]         # drawn width in squares (the label band is always 0.25)
+outline_probability = 0.7    # dark ink outline around the walls
+
+[furniture]
+per_room = [1, 4]            # items per room, inclusive range
+against_wall_share = 0.45    # shelves, counters and beds along walls: wall-like distractors
+
+[lights]
+lit = [3, 8]                 # lit light sources per map, inclusive range
+unlit = [1, 3]               # unlit fixtures (distractors for the light class)
+tier_weights = { small = 0.55, medium = 0.3, large = 0.15 }
+
+[effects]
+glow_probability = 0.5       # baked lighting: dark ambient and glows around lit lights
+grid_probability = 0.6
+tint_probability = 0.3
+blur_probability = 0.2
+jpeg_probability = 0.3       # JPEG artifacts, saved back losslessly
