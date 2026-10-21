@@ -73,7 +73,7 @@ Build this first; every dataset depends on it. It reads a .dd2vtt, draws each `l
 ### Dungeondraft maps
 
 - Build rough 25×25-square maps fast (15–20 minutes each): walls, doors, windows, at least 3 lit light sources of two or more tiers, a scatter of furniture. No detailing.
-- Re-export `dd01`–`dd03` (all four variants) with lights added; their first exports have none.
+- New layouts `dd04`–`dd18` follow `map-specs.md`: each targets a weakness of the first three (diagonal and curved walls, caves, broken walls, wall-like furniture, dense rooms, lights of all tiers). `dd01`–`dd03` draw no lit light sources, so they stay as lights-free maps.
 - Export each layout 4 times (`a`–`d`) with different wall styles, floor textures, and lighting; at least one variant without grid.
 - The `.dungeondraft_map` source file is not used; labels come only from the .dd2vtt export.
 
@@ -207,7 +207,7 @@ The plan front-loads data and the end-to-end path, so a working (if rough) Roll2
 **Week by week:**
 
 1. **20–26.10:** Confirm course requirements. Write labeling rules (lights added 21.10). Build the .dd2vtt → mask rasterizer. Set up the repo and Docker. Make 3 Dungeondraft maps (25×25, Roll20 grid preset). Upload a hand-made .dd2vtt to Roll20 to prove the format.
-2. **27.10–2.11:** Synthetic generator v1 (with lights). Light labels in the rasterizer, if not done in week 1. Canny baseline. Evaluation harness (pixel IoU, boundary F1). 5 more Dungeondraft maps; re-export `dd01`–`dd03` with lights; check how Roll20 imports lights.
+2. **27.10–2.11:** Synthetic generator v1 (with lights). Light labels in the rasterizer, if not done in week 1. Canny baseline. Evaluation harness (pixel IoU, boundary F1). 5 more Dungeondraft maps (`map-specs.md`); check how Roll20 imports lights.
 3. **3–9.11:** First U-Net trained on synthetic data; tune augmentation. 5 more Dungeondraft maps. Start hand-labeling the test set.
 4. **10–16.11:** Fine-tune on Dungeondraft maps. Vectorization v1 and the .dd2vtt writer.
 5. **17–23.11:** First end-to-end run: map → model → .dd2vtt → Roll20. Add the visibility IoU metric. **Milestone: first Roll20 import.**

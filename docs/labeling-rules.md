@@ -175,3 +175,8 @@ apply it everywhere.
 | Glass window drawn as a thin plain line in the wall | Portal; subtle but visible | `dd03` (right-hand room) |
 | Several portals stacked at the same position | One portal; the mask is the same either way. Deduplicate before counting portals or writing a .dd2vtt | `dd01_a`, `dd01_b` |
 | Several lights stacked on one sprite | One light, with the largest tier. Deduplicate (within 0.25 squares) before drawing | - |
+| Pillars and columns | Background, like statues. A pillar class stays a stretch goal | `dd08`, `dd09` (planned) |
+| Tents | Background: objects, not built walls | `dd12` (planned) |
+| Rows of cell bars | Avoided in maps: cell fronts are walls with a barred door portal | `dd10` (planned) |
+| Open shop front with a counter | Gap (background); the counter is furniture | `dd13` (planned) |
+| Arrow slits | Portal: a very thin window | `dd08` (planned) |

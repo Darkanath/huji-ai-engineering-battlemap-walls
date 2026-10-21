@@ -2,7 +2,8 @@
 
 One file per week. Open the file for the current week and work top to bottom: it lists every file
 to create, the commands to run and what "done" means. The overall plan and the reasons behind it
-are in [PLAN.md](../PLAN.md); the rules for labels are in [labeling-rules.md](../labeling-rules.md);
+are in [PLAN.md](../PLAN.md); the rules for labels are in [labeling-rules.md](../labeling-rules.md); what goes on each
+Dungeondraft map is in [map-specs.md](../map-specs.md);
 how the models are trained is in [training.md](../training.md).
 
 | Week | Dates | Focus | File |

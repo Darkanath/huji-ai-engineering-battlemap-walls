@@ -6,7 +6,8 @@ scored on the validation split against the Canny baseline. All training settings
 
 ## You
 
-- [ ] 5 more Dungeondraft layouts × 4 variants: `dd09`–`dd13`.
+- [ ] 5 more Dungeondraft layouts × 4 variants: `dd09`–`dd13`, as specified in
+      [map-specs.md](../map-specs.md).
 - [ ] Start the hand-labeled test set (10–15 maps in total by week 6): collect the images in
       `data/raw/test/`, list them in `data/raw/test/test_maps.csv`, and trace them in Dungeondraft
       following "Hand-tracing the test set" in the labeling rules (export, then

@@ -14,13 +14,9 @@ the first Dungeondraft maps checked against those rules.
 - [ ] *(optional)* Try a .dd2vtt whose embedded image is JPEG, to see whether output files can be
       lighter. If not done this week, it moves to week 5's Roll20 test.
 - [ ] Confirm with the course staff what the final submission must include (still open in PLAN.md).
-- [ ] **Lights (added 21.10):** add at least 3 lit light sources of two or more tiers to each of
-      `dd01`–`dd03`, each with a Dungeondraft light at its tier's `range` (labeling rules, "Light
-      (class 3)"), and re-export all 12 variants with the same lights. If not done this week, it
-      moves to week 2.
-- [ ] Upload the re-exported `dd01_a.dd2vtt` to Roll20 and note how each tier's light imports
-      (bright and dim radius from `range` and `intensity`) in `docs/labeling-rules.md`. Also check
-      that `range` in the .dd2vtt is in grid squares. If not done this week, it moves to week 2.
+- [x] **Lights (added 21.10):** `dd01`–`dd03` draw no lit light sources (only an unlit stove in
+      `dd01`), so their empty `lights` is correct and they need no re-export. New layouts follow
+      [map-specs.md](../map-specs.md).
 
 ## Code
 
@@ -52,7 +48,7 @@ doors and windows, light discs only on lit light sources.
 - [x] Labeling rules written and linked from the README.
 - [x] 3 layouts × 4 variants exported, rasterized and checked; `docs/dungeondraft-maps.md` updated.
 - [x] A .dd2vtt uploaded to Roll20 with working walls and doors.
-- [ ] Rasterizer labels lights; `dd01`–`dd03` re-exported with lights and checked (may slip to week 2).
+- [x] Rasterizer labels lights.
 
 ## Report
 

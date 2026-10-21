@@ -25,7 +25,8 @@ Week 1 of 9 (final presentation 2026-12-23).
 - [x] `.dd2vtt` -> class mask rasterizer, with tests
 - [ ] Synthetic map generator, Canny baseline, evaluation harness
 - [ ] U-Net training (synthetic, then Dungeondraft fine-tuning)
-- [ ] Light labels in the rasterizer; Dungeondraft maps re-exported with lights
+- [x] Light labels in the rasterizer
+- [ ] Dungeondraft layouts `dd04`–`dd18` (`docs/map-specs.md`)
 - [ ] Mask -> `.dd2vtt` post-processing and writer
 - [ ] Light post-processing (blob -> position and size tier -> range)
 - [ ] Gradio app

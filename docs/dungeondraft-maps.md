@@ -29,10 +29,10 @@ All `b`, `c` and `d` variants have the same walls and portals as their `a` (mask
 (new floor, no grid). The `c` variants share one grey patterned floor; the `d` variants each
 have their own floor and no grid.
 
-**Lights (21.10):** none of these exports has lights (`lights` is empty in every file). `dd01`–`dd03`
-get at least 3 lit light sources each and all 12 variants are re-exported; the Lights column then
-gives the count per tier (small / medium / large). The demo map stays as it is: the tests rely on it.
+**Lights (21.10):** none of these exports has lights (`lights` is empty in every file), and none
+draws a lit light source (`dd01` has an unlit stove), so the empty list is the correct label. They
+stay as they are, as lights-free maps. From `dd04` on, the Lights column gives the count per tier
+(small / medium / large).
 
-For the next layouts: 4 variants (`a`–`d`) as in the labeling rules, with different floors across
-layouts, the grid off in at least one variant, and at least 3 lit light sources of two or more
-tiers.
+The next layouts, `dd04`–`dd18`, follow [map-specs.md](map-specs.md): what goes on each layout
+and what changes in each variant.

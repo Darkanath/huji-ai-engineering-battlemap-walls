@@ -5,10 +5,12 @@ maps can be generated; predictions can be scored; the classical baseline has a f
 
 ## You
 
-- [ ] 5 more Dungeondraft layouts × 4 variants (`a`–`d`, one without grid): `dd04`–`dd08`, each
-      with at least 3 lit light sources of two or more tiers.
-- [ ] If not done in week 1: re-export `dd01`–`dd03` with lights, and check in Roll20 how lights
-      import.
+- [ ] 5 more Dungeondraft layouts × 4 variants: `dd04`–`dd08`, as specified in
+      [map-specs.md](../map-specs.md).
+- [ ] Upload `dd04_a.dd2vtt` (the first export with lights) to Roll20 and note how each tier's
+      light imports (bright and dim radius from `range` and `intensity`) in
+      `docs/labeling-rules.md`. Also check that `range` in the .dd2vtt is in grid squares. Do this
+      before finishing the other layouts: if the unit is wrong, every light's range changes.
 - [ ] Pick a small set of CC0 textures (floors, walls), furniture sprites and light source
       sprites (torch, candle, lantern, brazier, campfire, bonfire; lit and unlit) for the generator and
       put them in `data/assets/` with a `SOURCES.md` listing where each came from. Only CC0 or
