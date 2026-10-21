@@ -21,7 +21,7 @@ lights turned from mask blobs into .dd2vtt lights, and the test set frozen.
 | `tests/test_grid.py` | Finds the grid on the demo map (70 px); returns `None` on a map exported without a grid. |
 | `eval/report.py` | Collect MLflow runs into the results table and the training-curve figures for the slides. |
 | `postprocess/lights.py` *(lights)* | Light blobs (drop ones under a minimum area) -> centroid = position, equivalent radius -> nearest tier (thresholds halfway between the label radii) -> `range` and `intensity` from the tier table. Wired into `app/pipeline.py` and the writer. |
-| `postprocess/configs/lights.toml` *(lights)* | The tier table: label radius, bright and dim, `range`, `intensity` per tier. Must match `docs/labeling-rules.md`. |
+| `postprocess/configs/lights.toml` *(lights)* | The output tier table: bright and dim, `range`, `intensity` per tier (label radii and tier ranges stay in `LIGHT_TIERS`, `data/rasterize.py`). Must match `docs/labeling-rules.md`. |
 | `eval/metrics.py` *(lights)* | Light F1 (one-to-one match within 0.5 squares) and tier accuracy on matched lights; added to `eval/evaluate.py`. |
 | `tests/test_lights.py` *(lights)* | Round trip on a hand-made map: rasterize -> `lights.py` returns the same positions (within 0.1 square) and tiers; a light disc cut by a wall still gives one light; light F1 is 1 for a perfect prediction and 0 for none. |
 

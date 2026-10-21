@@ -11,12 +11,16 @@ from PIL import Image
 
 from data.rasterize import (
     BACKGROUND,
+    LIGHT,
+    LIGHT_TIERS,
     PORTAL,
     WALL,
     class_shares,
     decode_image,
+    light_tier,
     load_uvtt,
     main,
+    parse_lights,
     rasterize_mask,
 )
 
@@ -35,10 +39,24 @@ def demo_mask(demo_uvtt: dict) -> np.ndarray:
     return rasterize_mask(demo_uvtt)
 
 
-def make_uvtt(image_ppg: int = 20, image_format: str = "PNG") -> dict:
+def make_light(x: float, y: float, tier: str) -> dict:
+    """A .dd2vtt light at grid position (x, y) with the `range` of `tier`."""
+    return {
+        "position": {"x": x, "y": y},
+        "range": LIGHT_TIERS[tier]["range"],
+        "intensity": 1.0,
+        "color": "ffeccd8b",
+        "shadows": True,
+    }
+
+
+def make_uvtt(
+    image_ppg: int = 20, image_format: str = "PNG", lights: list[dict] | None = None
+) -> dict:
     """A 4x4-square map with origin (1, 1): one horizontal wall with a portal in it.
 
-    `image_format` sets how the embedded image is encoded (PNG or JPEG).
+    `image_format` sets how the embedded image is encoded (PNG or JPEG);
+    `lights` are added as the map's .dd2vtt lights (none by default).
     """
     image = Image.new("RGB", (4 * image_ppg, 4 * image_ppg), (200, 180, 150))
     buf = io.BytesIO()
@@ -52,6 +70,7 @@ def make_uvtt(image_ppg: int = 20, image_format: str = "PNG") -> dict:
         },
         "line_of_sight": [[{"x": 1, "y": 3}, {"x": 5, "y": 3}]],
         "portals": [{"bounds": [{"x": 2, "y": 3}, {"x": 3, "y": 3}]}],
+        "lights": lights or [],
         "image": base64.b64encode(buf.getvalue()).decode(),
     }
 
@@ -60,9 +79,9 @@ def make_uvtt(image_ppg: int = 20, image_format: str = "PNG") -> dict:
 
 
 def test_demo_mask_has_only_known_classes(demo_mask: np.ndarray) -> None:
-    """The mask is uint8 and uses only class ids 0 (background), 1 (wall), 2 (portal)."""
+    """The mask is uint8 and uses only class ids 0 (background) to 3 (light)."""
     assert demo_mask.dtype == np.uint8
-    assert set(np.unique(demo_mask)) <= {BACKGROUND, WALL, PORTAL}
+    assert set(np.unique(demo_mask)) <= {BACKGROUND, WALL, PORTAL, LIGHT}
 
 
 def test_demo_mask_matches_image_size(demo_uvtt: dict, demo_mask: np.ndarray) -> None:
@@ -77,6 +96,7 @@ def test_demo_class_shares(demo_mask: np.ndarray) -> None:
     shares = class_shares(demo_mask)
     assert 0.05 < shares["wall"] < 0.09  # about 7%
     assert 0 < shares["portal"] < 0.02  # under 1-2%
+    assert shares["light"] == 0  # the demo map has no lights
     assert sum(shares.values()) == pytest.approx(1.0)
 
 
@@ -93,6 +113,46 @@ def test_wall_and_portal_land_on_expected_pixels() -> None:
     assert mask[20, 15] == PORTAL  # portal from x=2..3 -> px 10..20, drawn over the wall
     assert mask[5, 5] == BACKGROUND
     assert mask[35, 35] == BACKGROUND
+
+
+@pytest.mark.parametrize("tier", list(LIGHT_TIERS))
+def test_light_disc_size_matches_tier(tier: str) -> None:
+    """Each tier is drawn as a disc of its radius, centered on the light's position."""
+    ppg = 40
+    mask = rasterize_mask(make_uvtt(lights=[make_light(3, 1.8, tier)]), ppg=ppg)
+    radius_px = LIGHT_TIERS[tier]["radius"] * ppg
+    assert (mask == LIGHT).sum() == pytest.approx(np.pi * radius_px**2, rel=0.15)
+    # Grid (3, 1.8) with origin (1, 1) -> pixel column 80, row 32.
+    assert mask[32, 80] == LIGHT
+
+
+def test_light_next_to_wall_leaves_wall_unbroken() -> None:
+    """A wall torch overlapping the wall band does not take any wall pixels."""
+    no_light = rasterize_mask(make_uvtt(), ppg=40)
+    with_light = rasterize_mask(make_uvtt(lights=[make_light(4.5, 3.15, "small")]), ppg=40)
+    assert np.array_equal(with_light == WALL, no_light == WALL)
+    assert (with_light == LIGHT).any()
+
+
+def test_light_tier_from_range() -> None:
+    """Ranges map to their tier within the tolerance; any other range is an error."""
+    assert light_tier(8) == "small"
+    assert light_tier(12.3) == "medium"
+    assert light_tier(16) == "large"
+    with pytest.raises(ValueError, match="matches no tier"):
+        light_tier(5)  # e.g. a light left at a default range
+
+
+def test_stacked_lights_merge_into_largest_tier() -> None:
+    """Lights stacked on one sprite become one light with the largest tier."""
+    uvtt = make_uvtt(
+        lights=[
+            make_light(3, 1.8, "small"),
+            make_light(3.1, 1.8, "large"),
+            make_light(2, 2, "small"),
+        ]
+    )
+    assert parse_lights(uvtt) == [(3, 1.8, "large"), (2, 2, "small")]
 
 
 def test_decode_rescales_any_source_ppg() -> None:
@@ -119,4 +179,6 @@ def test_cli_writes_outputs(tmp_path: Path, capsys: pytest.CaptureFixture) -> No
     assert Image.open(tmp_path / "out" / "tiny_image.jpg").format == "JPEG"
     saved = np.array(Image.open(tmp_path / "out" / "tiny_mask.png"))
     assert set(np.unique(saved)) == {BACKGROUND, WALL, PORTAL}
-    assert "wall" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "wall" in out
+    assert "lights small 0, medium 0, large 0" in out

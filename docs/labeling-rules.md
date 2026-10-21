@@ -64,8 +64,9 @@ brightness comes from a fixed table. The GM can change the values in the app bef
 | large | bonfire, large fire pit, forge | 0.60 squares | 8 / 8 (project choice) | 16 |
 
 - The bright and dim values follow D&D 5e where it has one (torch, lantern); the large tier is a
-  project choice. The table lives in `postprocess/configs/lights.toml` once the code exists; this
-  page and that file must agree.
+  project choice. The label side (tier `range` and disc radius) is `LIGHT_TIERS` in
+  `data/rasterize.py`; the output side (bright, dim, `range`, `intensity` written to the .dd2vtt,
+  editable in the app) will be `postprocess/configs/lights.toml`. This page and both must agree.
 - How Roll20 turns a .dd2vtt light's `range` and `intensity` into bright and dim light is checked
   by hand in week 2. The `range` column and the writer follow what that check finds.
 - **Tier comes from `range`.** When you place a light in Dungeondraft, set its range to the

@@ -71,7 +71,8 @@ Datasets, checkpoints and logs are mounted as Docker volumes so they persist on 
   No door/window type.
 - `lights`: each has `position`, `range` (grid squares), `intensity`, `color`, `shadows`. Labels
   read `position` and map `range` to a size tier; the output writes one light per detected blob,
-  with `range` and `intensity` from the tier table (`postprocess/configs/lights.toml`).
+  with `range` and `intensity` from the tier table (`postprocess/configs/lights.toml`). Label
+  tiers (range -> disc radius) are `LIGHT_TIERS` in `data/rasterize.py`.
 - `image`: base64-encoded PNG of the map. **This embedded image is the source of truth** for
   training. A same-named `.png` next to a `.dd2vtt` in `data/raw/` is optional: use it only for
   viewing, and if code reads it, first check its size matches `map_size` x `pixels_per_grid`.

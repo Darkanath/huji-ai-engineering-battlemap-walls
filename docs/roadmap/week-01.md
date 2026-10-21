@@ -29,11 +29,11 @@ the first Dungeondraft maps checked against those rules.
 | `Dockerfile`, `docker-compose.yml` | Ubuntu 24.04, Python 3.12 venv, CPU-only torch; `data/`, `runs/`, `tests/` volumes | done |
 | `pyproject.toml` | Package config, ruff, pytest; minimal dependencies | done |
 | `data/rasterize.py` | .dd2vtt -> JPEG image + PNG class mask + preview | done |
-| `tests/test_rasterize.py` | 7 tests: demo map and a hand-made map | done |
+| `tests/test_rasterize.py` | 7 tests: demo map and a hand-made map (13 with lights) | done |
 | `docs/labeling-rules.md` | Classes, edge cases, Dungeondraft and hand-tracing checklists | done |
 | `docs/dungeondraft-maps.md` | Log of the Dungeondraft maps | done |
-| `data/rasterize.py` | Lights: tier from `range` (error on an unknown range), disc per tier drawn under walls and portals, lights in the preview | to do |
-| `tests/test_rasterize.py` | A hand-made map with one light per tier: disc sizes right; a light next to a wall leaves the wall unbroken; an unknown range raises | to do |
+| `data/rasterize.py` | Lights: tier from `range` (error on an unknown range), disc per tier drawn under walls and portals, lights in the preview | done |
+| `tests/test_rasterize.py` | A hand-made map with one light per tier: disc sizes right; a light next to a wall leaves the wall unbroken; an unknown range raises; stacked lights merge | done |
 
 ## Run
 
