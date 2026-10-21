@@ -33,7 +33,8 @@ The skeleton tracer is written by hand, so `skan` is not needed.
 ## Run
 
 ```bash
-docker compose run --rm app python -m train.train --config train/configs/stage2_real.toml
+docker compose run --rm app python -m data.manifest && docker compose run --rm app python -m data.pack
+# On Colab: notebooks/colab_train.ipynb with train/configs/stage2_real.toml (new pack uploaded first)
 docker compose run --rm app pytest tests/test_postprocess.py -v
 ```
 

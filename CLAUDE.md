@@ -22,10 +22,16 @@ Week-by-week tasks, file names and done criteria: `docs/roadmap/week-NN.md` (ind
   blob's **size tier** (small / medium / large) and a lookup table, never from a learned
   regression. Lights are lower priority than walls and portals: if time runs short, they are cut
   first.
-- **CPU only.** Intel CPU, no NVIDIA GPU. Install the CPU-only PyTorch build. Never add CUDA
-  dependencies or `.cuda()` calls. Use `torch.device("xpu")` only if `torch.xpu.is_available()`,
-  otherwise CPU.
-- **Runs on the laptop under Docker**, Ubuntu 24.04 base image, started with Docker Compose.
+- **Training runs on Google Colab (GPU); everything else runs locally on CPU.** Data
+  generation, the manifest, tests, evaluation, ONNX export, inference and the app run on the
+  laptop (Intel CPU, no NVIDIA GPU). Model training (`train.train`) runs on a Colab GPU through
+  `notebooks/colab_train.ipynb`, with data and runs on Google Drive. The Docker image keeps the
+  **CPU-only PyTorch build**: never add CUDA dependencies to it. Training code picks its device in
+  one place (`train/model.py`): CUDA if available, else XPU if `torch.xpu.is_available()`, else
+  CPU, always via `.to(device)`, never `.cuda()`. Training must still run on the CPU (slowly), as
+  a fallback and for the tests.
+- **Runs on the laptop under Docker** (all but training), Ubuntu 24.04 base image, started with
+  Docker Compose.
 - **Every dataset is saved to disk** (never generated on the fly during training) so it can be
   showcased: image, .dd2vtt and mask per map, a fixed seed per map, and a manifest CSV.
 - **Pretrained models are allowed.** Default model: U-Net with a pretrained ResNet-18 encoder
@@ -36,6 +42,8 @@ Week-by-week tasks, file names and done criteria: `docs/roadmap/week-NN.md` (ind
 
 - Python 3.12 (Ubuntu 24.04 default), in a virtual environment inside the container (PEP 668).
 - PyTorch + torchvision CPU wheels: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu`
+  (Docker image). On Colab, use the preinstalled CUDA PyTorch and install only the project's
+  other packages.
 - `segmentation_models_pytorch`, `albumentations`, `opencv-python-headless`, `scikit-image`,
   `numpy`, `Pillow`, `shapely` (visibility polygons), `onnxruntime` (serving), `gradio` (UI),
   `fastapi` + `uvicorn` (optional API), `mlflow` (run tracking), `pytest`, `ruff`.
@@ -123,5 +131,7 @@ Datasets, checkpoints and logs are mounted as Docker volumes so they persist on 
 - Every module that transforms data gets a pytest test, using the demo map in `data/raw/dungeondraft/`.
 - Seed everything (`random`, `numpy`, `torch`) from config; log every run to MLflow with its config.
 - Run everything through Docker Compose, e.g. `docker compose run --rm app pytest`.
-- Set `torch.set_num_threads()` to the physical core count; use channels-last memory format.
+- On CPU, set `torch.set_num_threads()` to the physical core count; use channels-last memory format.
+- Training writes a resumable `last.pt` every epoch (Colab sessions disconnect) and logs the
+  device and GPU name with each run.
 - Prefer simple, working, measured solutions over clever ones. Ask before adding a new dependency.

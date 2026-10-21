@@ -100,7 +100,7 @@ Train only on synthetic maps and maps you made (in Dungeondraft or Dungeon Alche
 
 Start with a U-Net on a pretrained ResNet-18 encoder (`segmentation_models_pytorch`), 4 output classes (background, wall, portal, light). It is simple, well understood, and strong on thin structures.
 
-**Scale normalization.** Before training and inference, resize every map so one grid square = a fixed size (32 px for training on CPU). Walls then always look about the same thickness, which makes the task much easier. This is why grid detection matters.
+**Scale normalization.** Before training and inference, resize every map so one grid square = a fixed size (32 px per square). Walls then always look about the same thickness, which makes the task much easier. This is why grid detection matters.
 
 **Training setup:**
 
@@ -110,15 +110,15 @@ Start with a U-Net on a pretrained ResNet-18 encoder (`segmentation_models_pytor
 - Inference: sliding 256 windows with overlap, averaged at the seams.
 - Track every run (MLflow or Weights & Biases): config, metrics, sample predictions.
 
-**Compute:** a single consumer GPU isn't available, so training runs on an Intel CPU. The setup is sized for that:
+**Compute.** **Decided (21.10): training runs on Google Colab (GPU, paid subscription); everything else stays on the laptop.** Data, tests, evaluation, inference and the app run locally under Docker on the CPU; only `train.train` runs on Colab, from a notebook that takes a zipped pack of the 32 px training data from Google Drive and writes checkpoints and logs back to Drive. A GPU turns overnight runs into runs of minutes to an hour, which leaves room for checks and retries. The run list stays fixed. The original CPU setup below still applies to the CPU fallback and to local inference:
 
 - **Smaller model:** a ResNet-18 encoder instead of ResNet-34. Freeze the encoder for the first epochs and train only the decoder, then unfreeze the last blocks.
 - **Smaller inputs:** train at 32 px per square (walls stay about 8 px thick) on 256×256 crops. Datasets are still saved at 70 px per square (Roll20's default) and scaled down when loaded.
-- **Fixed crop budget per epoch:** sample about 2,000 crops per epoch rather than every crop of every map. Expect a full run to take hours, so run training overnight.
+- **Fixed crop budget per epoch:** sample about 2,000 crops per epoch rather than every crop of every map. On the CPU a full run takes hours (overnight); on Colab much less.
 - **CPU settings:** recent PyTorch already uses Intel's CPU math libraries. Set the thread count to the physical cores, use channels-last memory format, and try bfloat16 autocast if the CPU supports it.
 - **Fewer, planned runs:** each ablation is a full run, so decide the run list up front and keep it to about 6 runs in total.
 - **Check for an Intel GPU:** if the machine has Intel Arc or Core Ultra graphics, PyTorch's XPU backend can use it and may be several times faster.
-- **Fallback:** free cloud GPUs (Colab, Kaggle) need no hardware of your own, if a run is too slow on CPU.
+- **Fallback:** if Colab is unavailable, the same code trains on the laptop CPU overnight.
 
 **Ablations to run** (these become the results section):
 
@@ -199,7 +199,7 @@ A small web app is enough: upload, preview, download. Keep it thin so the time g
 - **Backend:** FastAPI. `POST /analyze` takes the image (+ optional squares-across), returns the .dd2vtt plus a preview PNG with walls, portals and lights overlaid in color.
 - **Frontend:** Gradio, so the whole project stays in Python: upload, the overlay preview, the light tier table (bright and dim per tier, pre-filled, editable), a download button.
 - **Model serving:** export to ONNX for CPU inference; a 256-tile U-Net runs fast enough without a GPU.
-- **Packaging:** everything runs on the laptop under Docker, on an Ubuntu 24.04 base image. One image covers data generation, training and the web app, started with Docker Compose. Install the CPU-only PyTorch build (much smaller, no CUDA). Mount the datasets, checkpoints and run logs as volumes so they persist outside the container and can be showcased. Give Docker enough CPU cores and RAM (Docker Desktop caps both by default). To use an Intel GPU from a container, pass the host's /dev/dri device through. Optional: push the same image to a cloud service for session 30 (Cloud Deployment, 07.12).
+- **Packaging:** everything runs on the laptop under Docker, on an Ubuntu 24.04 base image. One image covers data generation, evaluation and the web app (and CPU training as a fallback), started with Docker Compose; model training itself runs on Colab. Install the CPU-only PyTorch build (much smaller, no CUDA). Mount the datasets, checkpoints and run logs as volumes so they persist outside the container and can be showcased. Give Docker enough CPU cores and RAM (Docker Desktop caps both by default). To use an Intel GPU from a container, pass the host's /dev/dri device through. Optional: push the same image to a cloud service for session 30 (Cloud Deployment, 07.12).
 - **Observability:** log inference time, map size and wall count per request. Lines up with sessions 29 and 31.
 - **Repo layout:** `data/` (generator, rasterizer), `train/`, `eval/`, `postprocess/`, `app/`, `notebooks/`. Open source it under MIT once the course is done.
 
@@ -213,7 +213,7 @@ The plan front-loads data and the end-to-end path, so a working (if rough) Roll2
 
 1. **20–26.10:** Confirm course requirements. Write labeling rules (lights added 21.10). Build the .dd2vtt → mask rasterizer. Set up the repo and Docker. Make 3 Dungeondraft maps (25×25, Roll20 grid preset). Upload a hand-made .dd2vtt to Roll20 to prove the format.
 2. **27.10–2.11:** Synthetic generator v1 (with lights). Light labels in the rasterizer, if not done in week 1. Canny baseline. Evaluation harness (pixel IoU, boundary F1). 5 more Dungeondraft maps (`dd04`–`dd08`, `map-specs.md`); check how Roll20 imports lights.
-3. **3–9.11:** First U-Net trained on synthetic data; tune augmentation. 5 more Dungeondraft maps (`dd09`–`dd13`). Start hand-labeling the test set.
+3. **3–9.11:** Colab training setup (data pack, notebook, resumable runs). First U-Net trained on synthetic data on Colab; tune augmentation. 5 more Dungeondraft maps (`dd09`–`dd13`). Start hand-labeling the test set.
 4. **10–16.11:** 5 Dungeon Alchemist maps (`da02`–`da06`), then fine-tune on the real maps. Vectorization v1 and the .dd2vtt writer.
 5. **17–23.11:** First end-to-end run: map → model → .dd2vtt → Roll20. Add the visibility IoU metric. **Milestone: first Roll20 import.**
 6. **24–30.11:** Ablations. Grid detection. Light post-processing and light metrics. Finalize the test set (10–15 maps, including the hard set).
@@ -233,6 +233,7 @@ The plan front-loads data and the end-to-end path, so a working (if rough) Roll2
 | Not enough real maps | Medium | Dungeon Alchemist maps are fast to make; rely more on synthetic data; 10 layouts × 3 variants is still usable |
 | Dungeon Alchemist exports differ from the pilot (new light assets, other wall data) | Low | Unknown light assets stop the conversion until a rule is added; every export is checked in the rasterizer preview |
 | Grid detection fails on gridless maps | High | User-entered size is the default fallback, not an error |
+| Colab session limits or disconnects interrupt a run; compute units run out | Medium | Resumable `last.pt` every epoch, runs written straight to Drive; the fixed run list keeps GPU use small; CPU training overnight as a fallback |
 | Time pressure in December (deployment and write-up compete) | Medium | Feature freeze on 07.12; the last two weeks are polish and writing only |
 | Course requirements differ from assumptions | Low | Pretrained models confirmed allowed; solo confirmed; still to confirm the submission format |
 

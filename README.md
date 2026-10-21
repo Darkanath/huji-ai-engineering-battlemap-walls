@@ -12,7 +12,7 @@ an image does not show how far a light reaches.
 
 - Input: `.png`, `.jpg`/`.jpeg` or `.webp` image
 - Output: `.dd2vtt` (walls, portals, lights, embedded map image), at 70 px per grid square
-- Runs on CPU, under Docker
+- Runs on CPU, under Docker; the model is trained on a Google Colab GPU
 
 See [`docs/PLAN.md`](docs/PLAN.md) for the full plan, data strategy and evaluation.
 Week-by-week tasks are in [`docs/roadmap/`](docs/roadmap/README.md).

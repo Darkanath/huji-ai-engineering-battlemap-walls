@@ -160,41 +160,70 @@ Run at the end of every epoch, on **whole maps**, not crops:
 - **Retuned once, in week 4**, when the real set is complete (`--retune`), so the baseline is
   tuned on the same val set the U-Net is selected on. After that the config is frozen.
 
-## 8. CPU setup
+## 8. Compute: Colab for training, the laptop for everything else
 
-- `torch.set_num_threads(6)` (physical cores of the i7-1365U); DataLoader with 2 workers; tensors
-  and model in `torch.channels_last`.
-- **Precision:** float32. This CPU has no native bfloat16 support (no AVX-512 BF16 or AMX), so
-  bf16 autocast would likely be slower. It gets checked once in the week 3 benchmark and kept
-  only if it is faster.
-- **Device:** `torch.device("xpu")` only if `torch.xpu.is_available()`, otherwise CPU. The Iris Xe
-  GPU is unlikely to be visible inside Docker on WSL, so plan on CPU.
-- **Benchmark first (week 3):** time 50 training steps and one validation pass, then set the epoch
-  count so one run fits in a night (about 8 hours).
-- **Time per run** *(estimate)*: about 0.25 s per crop for forward and backward -> 8–10 minutes
-  per 2,000-crop epoch, plus about 1 minute of validation. Stage 1 at 30 epochs ≈ 5 hours; stage 2
-  at 20 epochs ≈ 3.5 hours. Epochs with a frozen encoder are faster.
+**Decided (21.10):** every training run (R1–R5) runs on a Google Colab GPU. Data, evaluation,
+inference and the app stay on the laptop, under Docker, on the CPU.
+
+**The round trip:**
+
+1. **Laptop:** build the data (`data.generator`, `data.manifest`), then
+   `python -m data.pack` zips `manifest.csv` and the 32 px training copies of the train and val
+   splits (the test split never leaves the laptop) into `runs/packs/data-<hash>.zip`, named by a
+   hash of `manifest.csv`. Upload it to `MyDrive/battlemap-walls/packs/`.
+2. **Colab** (`notebooks/colab_train.ipynb`): mount Drive, clone the repo at the commit to train
+   (a GitHub token from Colab secrets if the repo is private), install the project without
+   PyTorch (Colab's CUDA build is already there), unzip the pack to local disk, and run
+   `python -m train.train --config ... --runs /content/drive/MyDrive/battlemap-walls/runs`.
+   Checkpoints, `metrics.csv` and MLflow logs go straight to Drive, so a disconnect loses at most
+   one epoch.
+3. **Resume:** `--resume` continues from `runs/<run>/last.pt` (model, optimizer, scheduler, epoch,
+   best score and RNG states, saved every epoch).
+4. **Laptop:** copy `runs/<run>/` from Drive into `runs/`, then evaluate, export to ONNX and use
+   the model locally on the CPU.
+
+**Settings:**
+
+- **Device** (`train/model.py`, one function): CUDA if available, else XPU, else CPU; always
+  `.to(device)`. The run logs the device and GPU name.
+- **Precision:** on CUDA, mixed precision (`torch.autocast`): bfloat16 if the GPU supports it,
+  else float16 with a gradient scaler. On the CPU, float32.
+- **Data loading:** on Colab, 2–4 DataLoader workers reading from local disk (not Drive, which is
+  slow for many small files). On the CPU fallback, `torch.set_num_threads(6)` (physical cores of
+  the i7-1365U), 2 workers, channels-last.
+- **Determinism:** seeds as in §9, plus `torch.backends.cudnn.deterministic = True` and
+  `benchmark = False`. A GPU run and a CPU run with the same seed are close but not identical;
+  the report says which hardware trained each run.
+- **Benchmark first (week 3):** time 50 training steps and one validation pass on Colab. With a
+  GPU the epoch counts in §5 stay as they are; the run list in §1 stays fixed too. The time saved
+  goes into the checks in §10 and into retries, not into more runs.
+- **Time per run** *(estimate, CPU fallback)*: about 0.25 s per crop -> 8–10 minutes per
+  2,000-crop epoch; stage 1 at 30 epochs ≈ 5 hours, stage 2 at 20 epochs ≈ 3.5 hours. On a Colab
+  GPU, expect minutes per epoch; measured in week 3.
 
 ## 9. Reproducibility and logging
 
 - **Seeds:** one `seed` per run in the config. It seeds `random`, `numpy` and `torch`, DataLoader
   workers (`worker_init_fn`) and crop sampling (`seed + epoch`).
 - **MLflow** (tracking store in `runs/mlruns`), for every run:
-  - params: the whole TOML config, the git commit, a hash of `manifest.csv`, threads, device;
+  - params: the whole TOML config, the git commit, a hash of `manifest.csv`, device and GPU
+    name, precision;
   - metrics per epoch: training loss, validation loss, IoU, F1, boundary F1, crop class shares,
     learning rates, epoch time;
   - artifacts: the config file, `best.pt`, `last.pt`, and prediction images for 6 fixed
     real val maps (at least 2 from each tool) at epoch 1, the middle epoch and the final epoch.
-- **Run folder:** `runs/<run-name>/` with the checkpoints, the config copy and `metrics.csv`.
+- **Run folder:** `runs/<run-name>/` with the checkpoints, the config copy, `metrics.csv` and the
+  prediction images, so everything the report needs is in the folder itself, whatever machine
+  MLflow ran on.
 
-## 10. Checks before an overnight run
+## 10. Checks before a full run
 
 1. `pytest` passes, including the 2-step training smoke test.
 2. **Overfit test:** one batch of 8 crops for 200 steps; the loss must go close to 0. If it
    doesn't, there is a bug in the data, the loss or the model.
 3. The augmented-crop contact sheet looks right: masks line up with walls after every transform.
 4. Crop class shares are near the planned bias (walls and portals present in most crops).
-5. The benchmark time per epoch fits the night.
+5. The benchmark time per epoch is measured and the run fits one Colab session, or resumes cleanly.
 
 ## 11. Config
 
@@ -244,10 +273,11 @@ stride = 192
 boundary_tolerance_px = 3
 
 [runtime]
-threads = 6
+device = "auto"               # cuda, then xpu, then cpu
+precision = "auto"            # cuda: bf16 if supported, else fp16 + grad scaler; cpu: fp32
 workers = 2
+threads = 6                   # cpu only
 channels_last = true
-bf16 = false
 ```
 
 ## 12. Files
@@ -257,9 +287,11 @@ bf16 = false
 | `data/manifest.py` | Splits, manifest, 32 px training copies |
 | `train/dataset.py` | Biased crop sampling from the 32 px copies |
 | `train/augment.py` | The augmentation table above |
-| `train/model.py` | Model construction, freezing, device and thread setup |
+| `data/pack.py` | Zip the manifest and 32 px train/val copies for Colab |
+| `notebooks/colab_train.ipynb` | Run `train.train` on a Colab GPU, data and runs on Drive |
+| `train/model.py` | Model construction, freezing, device (CUDA, XPU, CPU) and thread setup |
 | `train/losses.py` | Weighted CE + Dice, class weights from the manifest |
-| `train/train.py` | Training loop, validation, checkpoints, MLflow |
+| `train/train.py` | Training loop, validation, resumable checkpoints, MLflow |
 | `train/predict.py` | Sliding-window inference (validation and the app) |
 | `eval/metrics.py` | IoU, F1, boundary F1, light F1 and tier accuracy |
 | `eval/baseline_canny.py` | R0 |

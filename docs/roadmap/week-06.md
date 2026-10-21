@@ -8,7 +8,8 @@ lights turned from mask blobs into .dd2vtt lights, and the test set frozen.
 - [ ] Finalize the test set: 10–15 maps, split into **in-domain** (Dungeondraft-like or Dungeon
       Alchemist-like) and **hard** (outdoor, photoreal). Record which is which in
       `data/raw/test/test_maps.csv` and `docs/map-log.md`.
-- [ ] Start one ablation run per night.
+- [ ] Run the ablations on Colab (`notebooks/colab_train.ipynb`), one config each; copy each
+      `runs/<run>/` back to the laptop.
 
 ## Code
 
@@ -32,7 +33,7 @@ plus Canny. Decide the list now and do not add to it.
 ## Run
 
 ```bash
-docker compose run --rm app python -m train.train --config train/configs/ablation_real_only.toml
+# On Colab: notebooks/colab_train.ipynb with train/configs/ablation_real_only.toml (and the others)
 docker compose run --rm app python -m eval.report --split val
 ```
 
