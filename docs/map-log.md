@@ -1,11 +1,17 @@
-# Dungeondraft maps
+# Map log
 
-The maps in `data/raw/dungeondraft/` (gitignored), named `<layout>_<variant>.dd2vtt` as set in
-[labeling-rules.md](labeling-rules.md). All style variants of one layout always go in the same
-split. All are 25×25 squares at 70 px per square.
+Every real map made for the project: Dungeondraft maps in `data/raw/dungeondraft/` and Dungeon
+Alchemist maps in `data/raw/dungeon_alchemist/` (both gitignored), named
+`<layout>_<variant>.dd2vtt` as set in [labeling-rules.md](labeling-rules.md). All style variants
+of one layout always go in the same split. What each new layout should contain is in
+[map-specs.md](map-specs.md).
 
 This log keeps what the file names leave out, for the data summary and the error analysis. The
 manifest CSV (week 2) will take it over.
+
+## Dungeondraft maps
+
+All are 25×25 squares at 70 px per square.
 
 | File | Layout | Variant | Walls | Objects | Wall / portal share | Lights | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -34,5 +40,15 @@ draws a lit light source (`dd01` has an unlit stove), so the empty list is the c
 stay as they are, as lights-free maps. From `dd04` on, the Lights column gives the count per tier
 (small / medium / large).
 
-The next layouts, `dd04`–`dd18`, follow [map-specs.md](map-specs.md): what goes on each layout
-and what changes in each variant.
+The next layouts, `dd04`–`dd13`, follow [map-specs.md](map-specs.md).
+
+## Dungeon Alchemist maps
+
+In `data/raw/dungeon_alchemist/` (originals in `original/`, lights converted with
+`data.retier_lights`; see [map-specs.md](map-specs.md)). 25×25 squares at 72 px per square. The
+next layouts, `da02`–`da06`, follow [map-specs.md](map-specs.md).
+
+| File | Layout | Variant | Look | Wall / portal / light share | Lights (S / M / L) | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| `da01_a` | da01 | a | Tavern on grass, grid, lights in the image | 2.7% / 0.8% / 0.8% | 20 / 3 / 0 | Pilot. Building covers about 16×13 squares; 5 double doors (2 portals each), 7 windows |
+| `da01_d` | da01 | d | Same, no grid, lights in VTT data only | 2.7% / 0.8% / 0.8% | 20 / 3 / 0 | Same walls, portals and lights as `a` |

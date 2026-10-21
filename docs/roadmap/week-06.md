@@ -5,15 +5,16 @@ lights turned from mask blobs into .dd2vtt lights, and the test set frozen.
 
 ## You
 
-- [ ] Finalize the test set: 10–15 maps, split into **in-domain** (Dungeondraft-like) and **hard**
-      (outdoor, photoreal). Record which is which in `docs/dungeondraft-maps.md` or a test-set log.
+- [ ] Finalize the test set: 10–15 maps, split into **in-domain** (Dungeondraft-like or Dungeon
+      Alchemist-like) and **hard** (outdoor, photoreal). Record which is which in
+      `data/raw/test/test_maps.csv` and `docs/map-log.md`.
 - [ ] Start one ablation run per night.
 
 ## Code
 
 | File | What |
 | --- | --- |
-| `train/configs/ablation_real_only.toml` | U-Net trained on Dungeondraft only. |
+| `train/configs/ablation_real_only.toml` | U-Net trained on the real maps only (Dungeondraft + Dungeon Alchemist). |
 | `train/configs/ablation_synthetic_only.toml` | Stage 1 model, no fine-tuning (reuses the week 3 run if its config matches). |
 | `train/configs/ablation_no_scale_norm.toml` | Same as the main run but without rescaling to 32 px per square. |
 | `train/configs/ablation_mobilenet.toml` *(stretch)* | MobileNetV3 encoder: accuracy vs CPU speed. |

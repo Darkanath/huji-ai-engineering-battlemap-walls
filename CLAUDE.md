@@ -43,15 +43,18 @@ Week-by-week tasks, file names and done criteria: `docs/roadmap/week-NN.md` (ind
 ## Repo layout
 
 ```
-data/            generator.py (synthetic maps), rasterize.py (.dd2vtt -> mask), manifest tools
-  raw/           source .dd2vtt files (dungeondraft/, synthetic/, test/)   [gitignored]
+data/            generator.py (synthetic maps), rasterize.py (.dd2vtt -> mask), manifest tools,
+                 retier_lights.py + configs/light_sources.toml (Dungeon Alchemist lights -> tiers)
+  raw/           source .dd2vtt files (dungeondraft/, dungeon_alchemist/, synthetic/, test/)
+                 [gitignored]; Dungeon Alchemist exports keep their originals in original/ and
+                 get their lights mapped to tiers by retier_lights.py
   processed/     image + mask pairs, manifest.csv                          [gitignored]
 train/           dataset, augmentations, training loop, configs/
 eval/            metrics (pixel IoU, boundary F1, visibility IoU), baseline (Canny), reports
-postprocess/     mask -> polylines -> portals -> .dd2vtt writer
+postprocess/     mask -> polylines -> portals -> lights -> .dd2vtt writer
 app/             Gradio app (upload, overlay preview, download .dd2vtt)
 notebooks/       exploration and figures for the presentation
-docs/            PLAN.md, labeling rules, results
+docs/            PLAN.md, labeling rules, training plan, map specs and log, roadmap, results
 runs/            checkpoints and MLflow logs                               [gitignored]
 tests/           pytest
 ```
@@ -81,7 +84,7 @@ Datasets, checkpoints and logs are mounted as Docker volumes so they persist on 
 ## Pipeline conventions
 
 - **Default map size: 25x25 squares** (1750x1750 px at 70 px per square). The synthetic generator
-  and new Dungeondraft maps use it by default, and the app pre-fills it as the map size the user
+  and new real maps use it by default, and the app pre-fills it as the map size the user
   can change. Code must still accept any map size.
 
 - **Scale normalization:** datasets are stored at 70 px per square; training and inference run at
@@ -91,9 +94,15 @@ Datasets, checkpoints and logs are mounted as Docker volumes so they persist on 
   0.63 MB vs 1.68 MB as PNG). Masks are **always PNG**: JPEG is lossy and would corrupt class ids.
 - Training: random 256x256 crops, ~2,000 crops per epoch, cross-entropy + Dice with class weights
   computed from the training split's pixel shares (wall share varies with wall thickness; demo
-  map: walls 7.4%, portals 0.6%). Stage 1 synthetic, stage 2 fine-tune on Dungeondraft.
-- Splits are **by map, never by crop**; all style exports of one Dungeondraft layout (`dd01_a`..`dd01_d`)
-  stay in the same split. The test set is run once, at the end.
+  map: walls 7.4%, portals 0.6%). Stage 1 synthetic, stage 2 fine-tune on the real maps.
+- **Real maps** = Dungeondraft (`ddNN`) + Dungeon Alchemist (`daNN`), both made by the user and
+  labeled from their export. Each tool is its own dataset, split by layout separately; they are
+  pooled for stage 2 training, validation and checkpoint selection. Dungeon Alchemist exports
+  are Orthographic (Top Down) at 72 DPI; their originals stay in
+  `data/raw/dungeon_alchemist/original/`, and their lights are mapped to tiers by
+  `data/retier_lights.py` before rasterizing.
+- Splits are **by map, never by crop**; all style exports of one layout (`dd01_a`..`dd01_d`,
+  `da01_a`..`da01_d`) stay in the same split. The test set is run once, at the end.
 - Post-processing: close small gaps with a kernel well under 0.25 square (doorless openings must
   stay open), skeletonize, trace, Douglas-Peucker, cut walls where portals cross, convert to grid
   units, write .dd2vtt.
@@ -104,7 +113,8 @@ Datasets, checkpoints and logs are mounted as Docker volumes so they persist on 
 - Lights in the mask: a disc at the light's `position`, radius by tier (0.25 / 0.40 / 0.60
   squares), drawn **under** walls and portals so a wall-mounted torch never cuts a gap in a wall.
   Post-processing: light blob -> centroid (position) + area (tier) -> range from the tier table.
-- Data licensing: train only on synthetic maps and maps the user made. Published third-party maps
+- Data licensing: train only on synthetic maps and maps the user made (Dungeondraft, Dungeon
+  Alchemist). Published third-party maps
   go in the test set only and are never redistributed.
 
 ## Working conventions

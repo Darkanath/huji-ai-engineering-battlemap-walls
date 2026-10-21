@@ -1,19 +1,23 @@
-# Week 4 · 10–16.11 · Fine-tune on Dungeondraft; mask -> .dd2vtt
+# Week 4 · 10–16.11 · Dungeon Alchemist maps, fine-tune on real maps; mask -> .dd2vtt
 
-**Goal:** the stage 2 model fine-tuned on Dungeondraft maps, and the post-processing that turns a
-predicted mask into a .dd2vtt. This is about half the engineering work, so it starts now.
+**Goal:** the real-map set finished, the stage 2 model fine-tuned on it (Dungeondraft and Dungeon
+Alchemist maps), and the post-processing that turns a predicted mask into a .dd2vtt. This is about half the engineering work, so it starts now.
 
 ## You
 
-- [ ] Finish the Dungeondraft set: `dd14`–`dd18` × 4 variants, as specified in
-      [map-specs.md](../map-specs.md) (18 layouts in total).
+- [ ] **Before the stage 2 run:** 5 Dungeon Alchemist layouts × 4 variants, `da02`–`da06`, as
+      specified in [map-specs.md](../map-specs.md). Save exports to
+      `data/raw/dungeon_alchemist/original/`, convert their lights with `data.retier_lights`
+      (add a rule for any new light asset), check each preview, and log them in
+      [map-log.md](../map-log.md). That makes 19 real layouts in total.
+- [ ] Rebuild the manifest, so the new maps get their splits.
 - [ ] Keep tracing test-set maps.
 
 ## Code
 
 | File | What |
 | --- | --- |
-| `train/configs/stage2_dungeondraft.toml` | Stage 2: start from the stage 1 checkpoint, Dungeondraft train split, lower learning rate. |
+| `train/configs/stage2_real.toml` | Stage 2: start from the stage 1 checkpoint, real train split (Dungeondraft + Dungeon Alchemist), lower learning rate. |
 | `train/predict.py` | Sliding-window inference: 256 windows with overlap, probabilities averaged at the seams; returns a class mask at the input's scale. |
 | `postprocess/clean.py` | Morphological close with a kernel well under 0.25 square (doorless gaps stay open); drop blobs under a minimum area. |
 | `postprocess/vectorize.py` | Skeletonize walls, trace the skeleton into polylines (graph walk from endpoints and junctions), simplify with Douglas–Peucker, optional snapping to horizontal and vertical. |
@@ -27,14 +31,14 @@ The skeleton tracer is written by hand, so `skan` is not needed.
 ## Run
 
 ```bash
-docker compose run --rm app python -m train.train --config train/configs/stage2_dungeondraft.toml
+docker compose run --rm app python -m train.train --config train/configs/stage2_real.toml
 docker compose run --rm app pytest tests/test_postprocess.py -v
 ```
 
 ## Done when
 
-- [ ] Stage 2 run finished; Dungeondraft validation scores logged next to stage 1 and Canny.
-- [ ] Round-trip test passes on the demo map and on every Dungeondraft validation map.
+- [ ] Stage 2 run finished; real validation scores (pooled and per tool) logged next to stage 1 and Canny.
+- [ ] Round-trip test passes on the demo map and on every real validation map.
 - [ ] All tests pass.
 
 ## Report

@@ -5,7 +5,7 @@ of war; visibility IoU measures what players actually see.
 
 ## You
 
-- [ ] Run the pipeline on 2–3 Dungeondraft validation maps, upload the .dd2vtt files to Roll20,
+- [ ] Run the pipeline on 2–3 real validation maps (at least one from each tool), upload the .dd2vtt files to Roll20,
       and time how long the manual fixes take. Note the times in `docs/results.md`.
 - [ ] **Milestone:** first Roll20 import from a model prediction.
 

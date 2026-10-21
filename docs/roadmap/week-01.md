@@ -14,6 +14,9 @@ the first Dungeondraft maps checked against those rules.
 - [ ] *(optional)* Try a .dd2vtt whose embedded image is JPEG, to see whether output files can be
       lighter. If not done this week, it moves to week 5's Roll20 test.
 - [ ] Confirm with the course staff what the final submission must include (still open in PLAN.md).
+- [x] **Dungeon Alchemist pilot (added 21.10):** `da01_a` and `da01_d` exported and checked;
+      walls, portals and lights land right after the light conversion. See
+      [map-specs.md](../map-specs.md).
 - [x] **Lights (added 21.10):** `dd01`–`dd03` draw no lit light sources (only an unlit stove in
       `dd01`), so their empty `lights` is correct and they need no re-export. New layouts follow
       [map-specs.md](../map-specs.md).
@@ -27,8 +30,10 @@ the first Dungeondraft maps checked against those rules.
 | `data/rasterize.py` | .dd2vtt -> JPEG image + PNG class mask + preview | done |
 | `tests/test_rasterize.py` | 7 tests: demo map and a hand-made map (13 with lights) | done |
 | `docs/labeling-rules.md` | Classes, edge cases, Dungeondraft and hand-tracing checklists | done |
-| `docs/dungeondraft-maps.md` | Log of the Dungeondraft maps | done |
+| `docs/dungeondraft-maps.md` (now `docs/map-log.md`) | Log of the Dungeondraft maps | done |
 | `data/rasterize.py` | Lights: tier from `range` (error on an unknown range), disc per tier drawn under walls and portals, lights in the preview | done |
+| `data/retier_lights.py`, `data/configs/light_sources.toml` | Map Dungeon Alchemist light ranges to the tiers, from a rules table; originals kept in `original/` | done |
+| `tests/test_retier_lights.py` | Ranges rewritten, drop rule, unknown lights all listed, originals untouched | done |
 | `tests/test_rasterize.py` | A hand-made map with one light per tier: disc sizes right; a light next to a wall leaves the wall unbroken; an unknown range raises; stacked lights merge | done |
 
 ## Run
@@ -46,7 +51,7 @@ doors and windows, light discs only on lit light sources.
 
 - [x] `docker compose run --rm app pytest` passes; `ruff check` is clean.
 - [x] Labeling rules written and linked from the README.
-- [x] 3 layouts × 4 variants exported, rasterized and checked; `docs/dungeondraft-maps.md` updated.
+- [x] 3 layouts × 4 variants exported, rasterized and checked; the map log updated.
 - [x] A .dd2vtt uploaded to Roll20 with working walls and doors.
 - [x] Rasterizer labels lights.
 

@@ -10,8 +10,8 @@ How every model in this project is trained, validated and selected. The week-by-
 | --- | --- | --- | --- | --- |
 | R0 | Canny + contours | nothing (thresholds tuned) | - | Classical baseline |
 | R1 | U-Net, ResNet-18 encoder | synthetic train | ImageNet encoder | Stage 1; also the "synthetic only" ablation |
-| R2 | U-Net, ResNet-18 encoder | Dungeondraft train | R1 best checkpoint | Stage 2: **main model** ("synthetic -> real") |
-| R3 | U-Net, ResNet-18 encoder | Dungeondraft train | ImageNet encoder | "Real only" ablation |
+| R2 | U-Net, ResNet-18 encoder | real train (Dungeondraft + Dungeon Alchemist) | R1 best checkpoint | Stage 2: **main model** ("synthetic -> real") |
+| R3 | U-Net, ResNet-18 encoder | real train | ImageNet encoder | "Real only" ablation |
 | R4 | U-Net, ResNet-18 encoder | as R1 + R2, at native 70 px per square | as R1 | "No scale normalization" ablation |
 | R5 *(stretch)* | U-Net, MobileNetV3 encoder | as R1 + R2 | ImageNet encoder | Accuracy vs CPU speed |
 
@@ -30,10 +30,16 @@ Inputs are RGB normalized with ImageNet mean and std, to match the pretrained en
 | Dataset | Maps | Split | Used for |
 | --- | --- | --- | --- |
 | Synthetic | 500 (more only if R1 shows it helps) | 90% train / 10% val, by map | R1, R4 stage 1 |
-| Dungeondraft | 15–20 layouts × 4 variants | ~70 / 15 / 15 by **layout** | R2, R3, R4 stage 2; validation for all runs |
-| Test | 10–15 hand-traced maps (in-domain and hard), plus the Dungeondraft test layouts | test only | Final evaluation, **once**, week 8 |
+| Dungeondraft | 13 layouts × 4 variants | ~70 / 15 / 15 by **layout** | R2, R3, R4 stage 2; validation for all runs |
+| Dungeon Alchemist | 6 layouts × 4 variants | ~70 / 15 / 15 by **layout** (at least 1 layout each in val and test) | as Dungeondraft |
+| Test | 10–15 hand-traced maps (in-domain and hard), plus the real test layouts | test only | Final evaluation, **once**, week 8 |
 
-- `data/manifest.py` assigns splits with a fixed seed and writes them to
+**Real** means Dungeondraft and Dungeon Alchemist together: both are maps made for the project,
+labeled from their own export. They are split separately (so each tool is in every split), then
+pooled for training, validation and selection. Results are also logged per tool, to show whether
+the model does better on one art style.
+
+- `data/manifest.py` assigns splits per dataset with a fixed seed and writes them to
   `data/processed/manifest.csv`. All variants of a layout stay in one split. Splits never change
   after they are first written.
 - The demo map (`demo-training-map`) is a test fixture only and is not used in any split.
@@ -125,16 +131,17 @@ Run at the end of every epoch, on **whole maps**, not crops:
 
 - **Inference:** sliding 256×256 windows with stride 192; softmax probabilities averaged where
   windows overlap; class = argmax. This is the same code (`train/predict.py`) the app uses.
-- **Validation sets:** Dungeondraft val for every run (the target domain), plus synthetic val in
-  stage 1. Both are logged; **selection uses Dungeondraft val only.**
+- **Validation sets:** real val (Dungeondraft + Dungeon Alchemist) for every run (the target
+  domain), plus synthetic val in stage 1. All are logged, real val also per tool; **selection uses
+  real val only.**
 - **Metrics each epoch:** validation loss; pixel IoU and F1 for wall, portal and light; wall
   boundary F1 with a tolerance of 3 px (0.1 square at 32 px per square).
 - **Light F1 and tier accuracy** need the light post-processing (`postprocess/lights.py`, week 6),
   so they run on the selected checkpoint of each run, like visibility IoU.
 - **Visibility IoU** is slower, so it runs only on the selected checkpoint (from week 5).
-- **Checkpoint selection:** the best epoch by **Dungeondraft val wall boundary F1**. Ties go to the
+- **Checkpoint selection:** the best epoch by **real val wall boundary F1**. Ties go to the
   higher portal IoU. `best.pt` and `last.pt` are both kept.
-- **Final model:** the run with the best Dungeondraft val boundary F1 across R1–R5, chosen in week
+- **Final model:** the run with the best real val boundary F1 across R1–R5, chosen in week
   6. Only then does the test set run, once.
 
 ## 7. Canny baseline (R0)
@@ -143,7 +150,7 @@ Run at the end of every epoch, on **whole maps**, not crops:
   than a minimum length -> draw them as 8 px walls. It predicts no portals and no lights (portal
   and light IoU are 0).
 - Tuning: a grid search over blur kernel, the two Canny thresholds, the close kernel and the
-  minimum length, on **Dungeondraft val**, maximizing wall boundary F1. The best values are
+  minimum length, on **real val**, maximizing wall boundary F1. The best values are
   frozen in `eval/configs/baseline_canny.toml` and never changed after week 2.
 
 ## 8. CPU setup
@@ -170,7 +177,7 @@ Run at the end of every epoch, on **whole maps**, not crops:
   - metrics per epoch: training loss, validation loss, IoU, F1, boundary F1, crop class shares,
     learning rates, epoch time;
   - artifacts: the config file, `best.pt`, `last.pt`, and prediction images for 6 fixed
-    Dungeondraft val maps at epoch 1, the middle epoch and the final epoch.
+    real val maps (at least 2 from each tool) at epoch 1, the middle epoch and the final epoch.
 - **Run folder:** `runs/<run-name>/` with the checkpoints, the config copy and `metrics.csv`.
 
 ## 10. Checks before an overnight run
@@ -194,8 +201,8 @@ seed = 42
 [data]
 manifest = "data/processed/manifest.csv"
 train = ["synthetic"]
-val = ["dungeondraft", "synthetic"]
-select_on = "dungeondraft"
+val = ["dungeondraft", "dungeon_alchemist", "synthetic"]
+select_on = ["dungeondraft", "dungeon_alchemist"]   # pooled: the real val set
 px_per_square = 32
 crop_size = 256
 crops_per_epoch = 2000

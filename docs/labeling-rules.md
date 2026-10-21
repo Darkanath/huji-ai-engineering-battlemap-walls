@@ -1,8 +1,9 @@
 # Labeling rules
 
 These rules define what the model learns. They apply to every dataset: synthetic maps, Dungeondraft
-maps and the hand-traced test set. If a map breaks a rule, fix the map, not the rule. If a rule
-turns out to be wrong, change it here first, then regenerate the affected masks.
+maps, Dungeon Alchemist maps and the hand-traced test set. If a map breaks a rule, fix the map,
+not the rule. If a rule turns out to be wrong, change it here first, then regenerate the affected
+masks.
 
 ## Classes
 
@@ -72,6 +73,8 @@ brightness comes from a fixed table. The GM can change the values in the app bef
 - **Tier comes from `range`.** When you place a light in Dungeondraft, set its range to the
   tier's value in the last column. The rasterizer reads the tier back from `range` and stops with
   an error on a range that matches no tier, so a light placed with the default range is caught.
+  Dungeon Alchemist sets ranges itself, so its lights are mapped to tiers by
+  `data/retier_lights.py` before the rasterizer sees them (see "Making Dungeon Alchemist maps").
 - **Position:** the center of the flame or lamp. A **wall-mounted** light (torch, sconce) goes on
   the room side of the wall, just off it, never on the wall's centerline. On the centerline its
   disc would be split by the wall band into two blobs, and Roll20 could not tell which side it
@@ -107,6 +110,8 @@ source files.
 
 ## Making Dungeondraft maps
 
+What goes on each new layout and how its variants differ is in [map-specs.md](map-specs.md).
+
 - **Map size:** 25×25 squares unless the layout needs otherwise.
 - **Export:** Universal VTT with the **Roll20 grid preset** (70 px per square).
 - **Style variants:** export each layout **4 times** (`a`–`d`) with the same walls and portals
@@ -129,6 +134,28 @@ source files.
 - **Check every export:** run `python -m data.rasterize <map>.dd2vtt` and look at the
   `_preview.jpg`. Red must cover only walls, magenta only doors and windows, and the light discs
   only lit light sources, at the right tier size.
+
+## Making Dungeon Alchemist maps
+
+Dungeon Alchemist (DA) furnishes rooms automatically and renders a 3D-looking style, so its maps
+add a second art style to the real data. Its exports were checked on the pilot `da01` (details
+in [map-specs.md](map-specs.md)).
+
+- **Export:** Universal VTT, camera **Orthographic (Top Down)**, **72 DPI** (72 px per square;
+  the rasterizer resizes to 70). Variant `d` exports lights to the **VTT data only**, so the
+  image has no glow. DA writes `baked_lighting: true` either way; ignore that flag.
+- **Variants and names:** as for Dungeondraft, 4 variants `daNN_a` ... `daNN_d` with the same
+  walls and portals. A restyle may re-roll furniture and lights; that is fine, because every
+  export carries its own labels.
+- **Doors and windows:** DA writes portals 1 square wide, so a double door is two portals side by
+  side. Doors are `closed: true`, windows `closed: false`; both are the portal class.
+- **Lights:** come from DA's light assets, with ranges DA chooses. Save every export to
+  `data/raw/dungeon_alchemist/original/` and convert it with `python -m data.retier_lights
+  --source dungeon_alchemist ... --out data/raw/dungeon_alchemist`. The rules in
+  `data/configs/light_sources.toml` map each asset's `range` and `intensity` to a tier, or drop
+  it (glowing crystals, magic effects). A light with no rule stops the conversion: find it in
+  the image, decide its tier by the rules above, and add a rule. Never edit the originals.
+- **Check every export** with the rasterizer preview, as for Dungeondraft maps.
 
 ## Hand-tracing the test set
 
@@ -175,8 +202,10 @@ apply it everywhere.
 | Glass window drawn as a thin plain line in the wall | Portal; subtle but visible | `dd03` (right-hand room) |
 | Several portals stacked at the same position | One portal; the mask is the same either way. Deduplicate before counting portals or writing a .dd2vtt | `dd01_a`, `dd01_b` |
 | Several lights stacked on one sprite | One light, with the largest tier. Deduplicate (within 0.25 squares) before drawing | - |
-| Pillars and columns | Background, like statues. A pillar class stays a stretch goal | `dd08`, `dd09` (planned) |
-| Tents | Background: objects, not built walls | `dd12` (planned) |
-| Rows of cell bars | Avoided in maps: cell fronts are walls with a barred door portal | `dd10` (planned) |
-| Open shop front with a counter | Gap (background); the counter is furniture | `dd13` (planned) |
-| Arrow slits | Portal: a very thin window | `dd08` (planned) |
+| Pillars and columns | Background, like statues. A pillar class stays a stretch goal | `dd07`, `da03` (planned) |
+| Tents | Background: objects, not built walls | `dd09` (planned) |
+| Rows of cell bars | Avoided in maps: cell fronts are walls with a barred door portal | `da04` (planned) |
+| Open shop front with a counter | Gap (background); the counter is furniture | `dd10` (planned) |
+| Arrow slits | Portal: a very thin window | `dd07` (planned) |
+| Double door written as two portals (DA) | Two portals; the mask is one continuous portal band either way | `da01` |
+| Light with no drawn source (DA effect) | Dropped by a `drop` rule in `light_sources.toml` | - |

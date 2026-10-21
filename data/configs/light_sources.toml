@@ -1,0 +1,16 @@
+# How lights exported by other map tools map to the project's light tiers
+# (docs/labeling-rules.md, "Light (class 3)"). Used by data/retier_lights.py.
+#
+# Each rule matches a light by its exported `range` and `intensity`, which are fixed per light
+# asset in the tool, and gives its tier: "small", "medium", "large", or "drop" for lights that
+# are not light sources by the labeling rules (glowing crystals, magic effects).
+# A light that matches no rule stops the conversion, so a new asset type is never guessed:
+# look at it in the preview, then add a rule here.
+
+[dungeon_alchemist]
+rules = [
+    { range = 4.0, intensity = 3.0, tier = "small", what = "wall sconce" },
+    { range = 4.0, intensity = 2.09, tier = "small", what = "candle on a table" },
+    { range = 5.0, intensity = 2.5, tier = "medium", what = "kitchen oven, cooking brazier" },
+    { range = 10.0, intensity = 3.0, tier = "medium", what = "fireplace" },
+]
