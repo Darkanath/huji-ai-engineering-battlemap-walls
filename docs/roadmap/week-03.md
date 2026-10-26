@@ -41,6 +41,9 @@ manifest. Also add `data/contact_sheet.py` *(done)*, a thumbnail grid per datase
 presentation; `python -m train.dataset --config ...` *(done)* prints the crop class shares and
 saves the augmented-crop sheet (training.md §10, check 3).
 
+Checks on Colab, 26.10: benchmark 2.1 min per epoch (1.0 h per 30-epoch run); overfit test
+passed (loss 3.25 -> 0.006).
+
 Then the EDA notebook, `notebooks/eda.ipynb` *(written 26.10; run it on Colab)* (course
 requirement; contents in PLAN.md, "Data cleaning & EDA"; figures saved to
 `MyDrive/battlemap-walls/eda/`), and start `docs/lessons.md`: one dated line per thing that didn't work or

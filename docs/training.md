@@ -195,6 +195,11 @@ inference and the app stay on the laptop, under Docker, on the CPU.
 - **Determinism:** seeds as in §9, plus `torch.backends.cudnn.deterministic = True` and
   `benchmark = False`. A GPU run and a CPU run with the same seed are close but not identical;
   the report says which hardware trained each run.
+- **Measured 26.10 on Colab (GPU), 500 synthetic + real maps:** 50 steps 21.5 s, validation of
+  54 maps 16.1 s, so about **2.1 min per epoch and 1.0 h for 30 epochs**: a whole run fits one
+  session. About 0.4 s per step is slow for a GPU, so data loading (2 vCPUs doing augmentation)
+  is likely the limit, not the GPU; fine at this run length. Overfit test passed (loss 3.25 ->
+  0.006 in 200 steps).
 - **Benchmark first (week 3):** time 50 training steps and one validation pass on Colab. With a
   GPU the epoch counts in §5 stay as they are; the run list in §1 stays fixed too. The time saved
   goes into the checks in §10 and into retries, not into more runs.
