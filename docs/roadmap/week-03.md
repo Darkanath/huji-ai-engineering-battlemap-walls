@@ -13,7 +13,7 @@ logged to MLflow, and scored on the validation split against the Canny baseline.
       following "Hand-tracing the test set" in the labeling rules (export, then
       `data/attach_image.py` swaps the original image in). Third-party maps never leave
       `data/raw/test/`.
-- [ ] Upload the data pack to `MyDrive/battlemap-walls/packs/` and run
+- [x] Upload the data pack to `MyDrive/battlemap-walls/packs/` and run
       `notebooks/colab_train.ipynb` for the benchmark, the checks (training.md §10) and the stage 1
       run. Copy `runs/<run>/` back from Drive.
 
@@ -66,9 +66,11 @@ docker compose run --rm -p 5000:5000 app mlflow ui --host 0.0.0.0 --backend-stor
 
 - [x] 500 synthetic maps on disk, in the manifest, with a contact sheet. *(26.10: 450 train,
       50 val; pack `data-e92adbca18.zip`, 91 MB.)*
-- [ ] Stage 1 run finished; best checkpoint saved; curves visible in MLflow.
-- [ ] U-Net beats Canny on synthetic validation wall IoU and boundary F1.
-- [ ] All tests pass. *(26.10, code only: 100 passed.)*
+- [x] Stage 1 run finished; best checkpoint saved; curves visible in MLflow. *(26.10: best epoch
+      16 of 24, early stop; [results.md](../results.md).)*
+- [x] U-Net beats Canny on synthetic validation wall IoU and boundary F1. *(0.903 / 0.996 vs
+      0.180 / 0.511; on real val 0.520 / 0.843 vs 0.384 / 0.845.)*
+- [x] All tests pass. *(26.10: 100 passed.)*
 
 ## Report
 
