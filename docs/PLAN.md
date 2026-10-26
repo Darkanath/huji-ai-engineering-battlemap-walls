@@ -28,7 +28,7 @@ From the course brief (`Graduation Project.pdf`, received 26.10). The plan alrea
 - **Added:** start data collection, **cleaning and EDA** early, and refine the goal from what the data shows (see Data cleaning & EDA).
 - Plan milestones for data, modeling, evaluation and presentation (Timeline).
 - **Final presentation: up to 12 minutes, no code.** Suggested structure: title, motivation, problem definition, **literature / related work (added)**, data (source, size, key properties, **cleansing techniques**), methodology, results and conclusions, limitations and future work. Share what worked, what worked best and **what didn't work** (kept in `docs/lessons.md` from week 3 on).
-- The brief does not say what to submit beyond the presentation; still open.
+- **Submission (confirmed 26.10):** the presentation itself (up to 12 minutes, given by me), a live demo and the code repository.
 
 ## Scope
 
@@ -262,7 +262,7 @@ The plan front-loads data and the end-to-end path, so a working (if rough) Roll2
 | Grid detection fails on gridless maps | High | User-entered size is the default fallback, not an error |
 | Colab session limits or disconnects interrupt a run; compute units run out | Medium | Resumable `last.pt` every epoch, runs written straight to Drive; the fixed run list keeps GPU use small; CPU training overnight as a fallback |
 | Time pressure in December (deployment and write-up compete) | Medium | Feature freeze on 07.12; the last two weeks are polish and writing only |
-| Course requirements differ from assumptions | Low | Pretrained models confirmed allowed; solo confirmed; still to confirm the submission format |
+| Course requirements differ from assumptions | Low | Pretrained models confirmed allowed; solo confirmed; submission confirmed (presentation, demo, repo) |
 
 ## Deliverables & open questions
 
@@ -277,6 +277,7 @@ The plan front-loads data and the end-to-end path, so a working (if rough) Roll2
 **Open questions (answer this week):**
 
 - [ ] Is fine-tuning a pretrained encoder acceptable, Answered: yes, pretrained models may be used, so the plan's pretrained encoder stays.
-- [ ] Team or solo: answered. Teams are allowed; starting solo, and the plan is scoped for one person. If a partner joins, hand them the synthetic generator or the web app. What does the final submission need to include?
+- [ ] Team or solo: answered. Teams are allowed; starting solo, and the plan is scoped for one person. If a partner joins, hand them the synthetic generator or the web app.
+- [x] Final submission: answered 26.10. The presentation (up to 12 minutes), a demo and the code repo.
 - [x] Doors vs. windows: answered. Not in the .dd2vtt, so the project uses one portal class only, with no door/window split.
 - [ ] Is `.dungeondraft_map` plain JSON? Yes, but out of scope: the project uses images and .dd2vtt only.

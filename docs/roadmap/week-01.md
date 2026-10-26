@@ -13,7 +13,8 @@ the first Dungeondraft maps checked against those rules.
       Roll20.
 - [ ] *(optional)* Try a .dd2vtt whose embedded image is JPEG, to see whether output files can be
       lighter. If not done this week, it moves to week 5's Roll20 test.
-- [ ] Confirm with the course staff what the final submission must include (still open in PLAN.md).
+- [x] Confirm with the course staff what the final submission must include. *26.10: the
+      presentation (up to 12 minutes), a demo and the code repo.*
 - [x] **Dungeon Alchemist pilot (added 21.10):** `da01_a` and `da01_d` exported and checked;
       walls, portals and lights land right after the light conversion. See
       [map-specs.md](../map-specs.md).
