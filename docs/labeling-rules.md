@@ -81,7 +81,46 @@ brightness comes from a fixed table. The GM can change the values in the app bef
   the room side of the wall, just off it, never on the wall's centerline. On the centerline its
   disc would be split by the wall band into two blobs, and Roll20 could not tell which side it
   lights.
-- Color, intensity and shadows are not labeled. Leave Dungeondraft's defaults.
+- Color, intensity and shadows are not labeled, but keep them the same on every light (below),
+  so the glow in the image changes with the tier and nothing else.
+
+### Light settings per tier
+
+**Dungeondraft:** place the sprite first, then a light on its flame (Light tool), with these
+settings. Only **Range** differs between tiers; it is what the rasterizer reads the tier from.
+These are the values in `dd04` and in the synthetic generator.
+
+| Tier | Sprites (Default pack) | Range | Intensity | Color | Shadows |
+| --- | --- | --- | --- | --- | --- |
+| **S** small | candle, candelabra, wall torch, wall sconce | **8** | 1 | `#eccd8b` (warm, `ffeccd8b` in the export) | on |
+| **M** medium | lantern (hanging or standing), brazier, campfire, lit fireplace | **12** | 1 | `#eccd8b` | on |
+| **L** large | bonfire, large fire pit, forge | **16** | 1 | `#eccd8b` | on |
+
+- A range off by more than 0.5 from 8, 12 or 16 stops the rasterizer with an error, so a light
+  left at Dungeondraft's default range is caught at the check.
+- One light per sprite. A candelabra or a chandelier is one light, not one per candle (lights
+  closer than 0.25 squares are merged anyway, keeping the largest tier).
+- "Shadows" here is the light's own setting (walls cast shadows from it). It is not the object
+  shadow setting, which stays **off** on every object (see "Making Dungeondraft maps").
+- Unlit versions of the same sprites (unlit torch, cold brazier, dead campfire) get **no** light.
+
+**Dungeon Alchemist:** you don't set range or intensity. Each light asset brings its own values,
+and `data/retier_lights.py` maps them to a tier afterwards with the rules in
+`data/configs/light_sources.toml`. So the spec is which assets to use for each tier:
+
+| Tier | Assets known so far (exported `range` / `intensity`) | Settings |
+| --- | --- | --- |
+| **S** small | wall sconce (4 / 3.0), candle on a table (4 / 2.09) | DA defaults |
+| **M** medium | kitchen oven or cooking brazier (5 / 2.5), fireplace (10 / 3.0) | DA defaults |
+| **L** large | none seen yet; candidates are a bonfire or a large fire pit | DA defaults |
+
+- Any light asset not in the table stops the conversion and prints its range, intensity and
+  position. Find it in the image, decide its tier with the examples at the top of this section
+  (a flame the size of a bonfire, fire pit or forge is L), and add a rule to
+  `light_sources.toml`. The first L asset gets added this way.
+- Glow-only assets (crystals, magic effects, glowing water) get the tier `drop`: they are not
+  light sources by these rules.
+- Light color doesn't matter (DA writes a different color in the `d` variant); leave it.
 
 **Not lights:**
 
