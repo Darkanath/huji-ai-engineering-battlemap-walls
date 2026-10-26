@@ -15,3 +15,4 @@ work as well as what did).
 | 26.10 | R1 epoch 1 labels every wall as a portal | Class weights push toward rare classes early; gone by epoch 6. Shown in the learning-progression figure |
 | 26.10 | R1 real-val boundary F1 plateaus (~0.84) while the training loss keeps falling | Synthetic-to-real gap; stage 2 fine-tuning on real maps. More real val layouts needed: one layout makes the best-epoch choice noisy |
 | 26.10 | R1 predicts a few light specks on light-free `dd03` (light IoU 0) | Minimum blob size in light post-processing (week 6) |
+| 26.10 | Colab EDA: `No module named 'data.rasterize'`. The pack was unzipped to `/content/data/`, and with `/content` as the working folder `import data` found that folder (a namespace package) instead of the project's `data` package | Both notebooks unzip to `/content/pack`; the EDA notebook also imports the project from its clone |
