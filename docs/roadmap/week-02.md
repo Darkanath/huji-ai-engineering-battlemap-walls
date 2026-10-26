@@ -51,7 +51,7 @@ docker compose run --rm app pytest
 - [x] `manifest.csv` lists the demo, all Dungeondraft, Dungeon Alchemist and synthetic maps with splits.
 - [x] Canny baseline tuned on validation, config frozen, validation scores saved
       (`runs/canny_val/metrics.csv`; tuned on `dd03` only, retuned once in week 4).
-- [ ] All tests pass.
+- [x] All tests pass (74 passed, 26.10).
 
 ## Report
 
