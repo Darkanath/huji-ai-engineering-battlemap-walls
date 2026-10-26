@@ -5,8 +5,11 @@ only: no new features.
 
 ## You
 
-- [ ] Slides: problem, data (contact sheets, data summary), model and training (curves, learning
-      progression), results (tables, ablations), demo, failures and limitations.
+- [ ] Slides, **12 minutes at most, no code** (course brief): title, motivation, problem,
+      related work (PLAN.md), data (sources, size, class shares, EDA figures, cleaning steps,
+      contact sheets), methodology (model, training curves, learning progression, ablations),
+      results and conclusions, what didn't work (`docs/lessons.md`), limitations and future work,
+      demo.
 - [ ] Demo video, about 2 minutes: map image -> app -> .dd2vtt -> Roll20 fog of war.
 - [ ] Rehearse at least twice, timed.
 - [ ] Presentation on **23.12**.

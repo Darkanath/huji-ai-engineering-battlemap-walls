@@ -38,6 +38,10 @@ logged to MLflow, and scored on the validation split against the Canny baseline.
 First: generate the full synthetic set (`python -m data.generator --count 500`) and rebuild the
 manifest. Also add `data/contact_sheet.py`, a thumbnail grid per dataset for the presentation.
 
+Then the EDA notebook, `notebooks/eda.ipynb` (course requirement; contents in PLAN.md, "Data
+cleaning & EDA"), and start `docs/lessons.md`: one dated line per thing that didn't work or
+changed the plan, for the presentation.
+
 ## Run
 
 ```bash
