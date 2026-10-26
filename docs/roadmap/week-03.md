@@ -41,8 +41,9 @@ manifest. Also add `data/contact_sheet.py` *(done)*, a thumbnail grid per datase
 presentation; `python -m train.dataset --config ...` *(done)* prints the crop class shares and
 saves the augmented-crop sheet (training.md §10, check 3).
 
-Then the EDA notebook, `notebooks/eda.ipynb` (course requirement; contents in PLAN.md, "Data
-cleaning & EDA"), and start `docs/lessons.md`: one dated line per thing that didn't work or
+Then the EDA notebook, `notebooks/eda.ipynb` *(written 26.10; run it on Colab)* (course
+requirement; contents in PLAN.md, "Data cleaning & EDA"; figures saved to
+`MyDrive/battlemap-walls/eda/`), and start `docs/lessons.md`: one dated line per thing that didn't work or
 changed the plan, for the presentation.
 
 ## Run
@@ -60,7 +61,8 @@ docker compose run --rm -p 5000:5000 app mlflow ui --host 0.0.0.0 --backend-stor
 
 ## Done when
 
-- [ ] 500 synthetic maps on disk, in the manifest, with a contact sheet.
+- [x] 500 synthetic maps on disk, in the manifest, with a contact sheet. *(26.10: 450 train,
+      50 val; pack `data-e92adbca18.zip`, 91 MB.)*
 - [ ] Stage 1 run finished; best checkpoint saved; curves visible in MLflow.
 - [ ] U-Net beats Canny on synthetic validation wall IoU and boundary F1.
 - [ ] All tests pass. *(26.10, code only: 100 passed.)*

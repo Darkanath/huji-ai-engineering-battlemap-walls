@@ -98,7 +98,7 @@ Build this first; every dataset depends on it. It reads a .dd2vtt, draws each `l
 The course asks for both, early, and the Data slide reports the cleansing techniques. Most checks already exist in the pipeline; this section names them so they can be shown.
 
 - **Cleaning (per map, before the manifest):** walls and portals line up with the image (rasterizer preview overlay); embedded image size = `map_size` × `pixels_per_grid`; light `range` matches a tier (the rasterizer stops otherwise); stacked duplicate lights merged; stacked or duplicate portals flagged (as in `dd01`); `objects_line_of_sight` from stray object shadows checked; Dungeon Alchemist lights re-tiered with the original kept. Every map dropped or fixed is noted in `map-log.md` with the reason.
-- **EDA notebook** (`notebooks/eda.ipynb`, week 3): maps and layouts per dataset and split; class pixel shares per map and dataset (wall, portal, light); wall thickness and portal width in squares; lights per tier; how far apart synthetic, Dungeondraft and Dungeon Alchemist are (color histograms, a few side-by-side crops). Its figures go straight into the Data slide.
+- **EDA notebook** (`notebooks/eda.ipynb`, week 3; **runs on Colab**, which has pandas and matplotlib, so the Docker image doesn't need them; it reads the same data pack as training, so test images stay on the laptop): maps and layouts per dataset and split; class pixel shares per map and dataset (wall, portal, light); wall thickness and portal width in squares; lights per tier; how far apart synthetic, Dungeondraft and Dungeon Alchemist are (color histograms, a few side-by-side crops). Its figures go straight into the Data slide.
 
 ### Labeling rules
 
