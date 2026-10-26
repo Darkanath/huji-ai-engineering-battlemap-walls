@@ -86,6 +86,12 @@ brightness comes from a fixed table. The GM can change the values in the app bef
 
 ### Light settings per tier
 
+**One standard for every source (decided 26.10):** the tier ranges **8 / 12 / 16** are the
+standard for all maps. Dungeondraft lights are set to them directly, the synthetic generator
+writes them, and Dungeon Alchemist's own per-asset values are converted to them by
+`data/retier_lights.py`. Dungeon Alchemist's raw values are not used as the standard: its
+medium lights alone have two ranges (5 and 10), and its sconce range (4) is half a 5e torch.
+
 **Dungeondraft:** place the sprite first, then a light on its flame (Light tool), with these
 settings. Only **Range** differs between tiers; it is what the rasterizer reads the tier from.
 These are the values in `dd04` and in the synthetic generator.
