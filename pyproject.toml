@@ -14,6 +14,9 @@ dependencies = [
     "numpy",
     "Pillow",
     "opencv-python-headless",  # week 2: Canny baseline, contours, distance transform for metrics
+    "segmentation-models-pytorch",  # week 3: U-Net with a pretrained ResNet-18 encoder
+    "albumentations",  # week 3: training augmentation (image and mask together)
+    "mlflow",  # week 3: run tracking (params, metrics per epoch, artifacts)
 ]
 
 [project.optional-dependencies]

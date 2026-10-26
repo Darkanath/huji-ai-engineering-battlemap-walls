@@ -129,7 +129,8 @@ the image only.
 
 Run at the end of every epoch, on **whole maps**, not crops:
 
-- **Inference:** sliding 256×256 windows with stride 192; softmax probabilities averaged where
+- **Inference:** sliding 256×256 windows with stride 192 (the last window moved in to end at
+  the map edge); softmax probabilities averaged where
   windows overlap; class = argmax. This is the same code (`train/predict.py`) the app uses.
 - **Validation sets:** real val (Dungeondraft + Dungeon Alchemist) for every run (the target
   domain), plus synthetic val in stage 1. All are logged, real val also per tool; **selection uses
@@ -197,15 +198,17 @@ inference and the app stay on the laptop, under Docker, on the CPU.
 - **Benchmark first (week 3):** time 50 training steps and one validation pass on Colab. With a
   GPU the epoch counts in §5 stay as they are; the run list in §1 stays fixed too. The time saved
   goes into the checks in §10 and into retries, not into more runs.
-- **Time per run** *(estimate, CPU fallback)*: about 0.25 s per crop -> 8–10 minutes per
-  2,000-crop epoch; stage 1 at 30 epochs ≈ 5 hours, stage 2 at 20 epochs ≈ 3.5 hours. On a Colab
+- **Time per run** *(CPU fallback; measured 26.10 on 18 synthetic maps: about 0.15–0.2 s per
+  crop plus about 6 s to validate 6 maps)*: 5–8 minutes per 2,000-crop epoch; stage 1 at 30 epochs ≈ 5 hours, stage 2 at 20 epochs ≈ 3.5 hours. On a Colab
   GPU, expect minutes per epoch; measured in week 3.
 
 ## 9. Reproducibility and logging
 
 - **Seeds:** one `seed` per run in the config. It seeds `random`, `numpy` and `torch`, DataLoader
   workers (`worker_init_fn`) and crop sampling (`seed + epoch`).
-- **MLflow** (tracking store in `runs/mlruns`), for every run:
+- **MLflow** (tracking store in `runs/mlruns`, plain files; MLflow 3 needs
+  `MLFLOW_ALLOW_FILE_STORE=true` for that, which `train/train.py` sets, because an SQLite store is
+  unreliable on Google Drive), for every run:
   - params: the whole TOML config, the git commit, a hash of `manifest.csv`, device and GPU
     name, precision;
   - metrics per epoch: training loss, validation loss, IoU, F1, boundary F1, crop class shares,

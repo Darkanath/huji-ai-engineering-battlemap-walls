@@ -1,0 +1,49 @@
+# R1, stage 1: U-Net (ResNet-18, ImageNet encoder) trained on the synthetic maps.
+# Also the "synthetic only" ablation. Settings and reasons: docs/training.md (§2-§6, §11).
+run_name = "r1_stage1_synthetic"
+seed = 42
+
+[data]
+manifest = "data/processed/manifest.csv"
+train = ["synthetic"]
+val = ["dungeondraft", "dungeon_alchemist", "synthetic"]
+select_on = ["dungeondraft", "dungeon_alchemist"]   # pooled: the real val set
+px_per_square = 32
+crop_size = 256
+crops_per_epoch = 2000
+crop_bias = { wall = 0.45, portal = 0.2, light = 0.1, random = 0.25 }
+
+[model]
+arch = "unet"
+encoder = "resnet18"
+encoder_weights = "imagenet"
+init_checkpoint = ""          # stage 2: "runs/r1_stage1_synthetic/best.pt"
+
+[train]
+epochs = 30
+batch_size = 8
+freeze_encoder_epochs = 5
+lr_decoder = 1e-3
+lr_encoder = 1e-4
+weight_decay = 1e-4
+warmup_epochs = 1
+min_lr = 1e-6
+early_stop_patience = 8
+grad_clip = 1.0
+
+[loss]
+ce_weight = 1.0
+dice_weight = 1.0
+class_weight_cap = 20.0
+
+[val]
+window = 256
+stride = 192
+boundary_tolerance_px = 3     # eval/metrics.py uses 0.1 square = 3 px at 32 px per square
+
+[runtime]
+device = "auto"               # cuda, then xpu, then cpu
+precision = "auto"            # cuda: bf16 if supported, else fp16 + grad scaler; cpu: fp32
+workers = 2
+threads = 6                   # cpu only: physical cores of the i7-1365U
+channels_last = true

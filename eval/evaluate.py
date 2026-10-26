@@ -8,6 +8,7 @@ selects checkpoints, docs/training.md) and one for everything ("all").
 
 Usage:
   python -m eval.evaluate --predictor canny --split val [--datasets ...] [--run NAME]
+  python -m eval.evaluate --predictor unet --checkpoint runs/<run>/best.pt --split val
 """
 
 import argparse
@@ -38,7 +39,20 @@ def canny() -> Predictor:
     return lambda image, ppg: baseline_canny.predict(image, params, ppg)
 
 
-PREDICTORS: dict[str, Callable[[], Predictor]] = {"canny": canny}
+def unet(checkpoint: Path) -> Predictor:
+    """A trained U-Net checkpoint, with the sliding-window inference used in validation."""
+    from train.model import pick_device
+    from train.predict import load_checkpoint_model, predict_mask
+
+    device = pick_device()
+    model, cfg = load_checkpoint_model(checkpoint, device)
+    v = cfg["val"]
+    return lambda image, ppg: predict_mask(
+        model, image, device, window=v["window"], stride=v["stride"]
+    )
+
+
+PREDICTORS: dict[str, Callable[..., Predictor]] = {"canny": canny, "unet": unet}
 
 
 def select_rows(manifest: Path, split: str, datasets: list[str] | None = None) -> list[dict]:
@@ -104,12 +118,16 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--datasets", nargs="+", help="default: every dataset in the split")
     ap.add_argument("--run", help="run folder name (default: <predictor>_<split>)")
     ap.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    ap.add_argument("--checkpoint", type=Path, help="unet only: the checkpoint to score")
     args = ap.parse_args(argv)
+    if args.predictor == "unet" and args.checkpoint is None:
+        ap.error("--predictor unet needs --checkpoint")
 
     rows = select_rows(args.manifest, args.split, args.datasets)
     if not rows:
         raise SystemExit(f"no maps in split {args.split!r}")
-    results = evaluate(args.manifest.parent, rows, PREDICTORS[args.predictor]())
+    factory_args = (args.checkpoint,) if args.predictor == "unet" else ()
+    results = evaluate(args.manifest.parent, rows, PREDICTORS[args.predictor](*factory_args))
     summary = summarize(results)
     out = RUNS / (args.run or f"{args.predictor}_{args.split}") / "metrics.csv"
     write_csv(out, results + summary)

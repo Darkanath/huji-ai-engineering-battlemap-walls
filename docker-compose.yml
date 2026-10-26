@@ -20,6 +20,11 @@ services:
       # Physical cores on the i7-1365U (6 cores, 12 threads).
       OMP_NUM_THREADS: "6"
       MKL_NUM_THREADS: "6"
+      # Pretrained encoder weights download once into runs/cache, so later runs work offline.
+      TORCH_HOME: /app/runs/cache/torch
+      HF_HOME: /app/runs/cache/huggingface
+      # The image has no git (training logs the commit on Colab); keep MLflow from warning.
+      GIT_PYTHON_REFRESH: quiet
     ports:
       # Gradio's default port, for the app in a later week.
       - "7860:7860"
