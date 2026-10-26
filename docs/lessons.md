@@ -11,3 +11,4 @@ work as well as what did).
 | 26.10 | Crops centered on a wall near the map edge get shifted inward, so the wall is no longer in the center | Expected; the crop still holds the wall, and the test checks only crops away from the edge |
 | 26.10 | MLflow 3 refuses its plain-file tracking store by default | Opted in (`MLFLOW_ALLOW_FILE_STORE`): files work on Google Drive, SQLite doesn't reliably |
 | 26.10 | EDA: real Dungeondraft maps are brighter than most synthetic maps (mean brightness 100–170 vs 20–140), and their walls are thinner (wall share 4.7% vs 8.7%) | Expected gap; stage 2 fine-tuning on real maps is there for it. Revisit the generator's brightness range if R1 transfers badly |
+| 26.10 | Colab: pretrained weights cached on Google Drive loaded as corrupt ("header too large"); a file just written through the Drive mount can read back incomplete | Weights cache on Colab's local disk (downloads once per session); only checkpoints and logs go to Drive |
