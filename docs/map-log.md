@@ -30,6 +30,10 @@ All are 25×25 squares at 70 px per square.
 | `dd01_d` | dd01 | d | thin dark walls, parquet floor, **no grid** | few | 4.8% / 0.3% | 0 | Parquet forms a square pattern: a hard case for grid detection. Same stacked portals as `a` |
 | `dd02_d` | dd02 | d | thin dark walls, grey concrete floor, **no grid** | many | 5.1% / 0.2% | 0 | |
 | `dd03_d` | dd03 | d | thin dark walls, wooden plank floor, **no grid** | none | 5.4% / 1.1% | 0 | Glass windows are thin lines in the wall, as in `a` |
+| `dd04_a` | dd04 | a | wood, parquet floor | many | 3.5% / 1.0% | 4 / 2 / 0 | Tavern and inn. 23 portals (7 doors, 1 double front door 3 squares wide, 15 windows), diagonal wall, kitchen arch and storeroom opening as gaps, 2 unlit sconces in the storeroom. Light share 0.3% |
+| `dd04_b` | dd04 | b | thin dark hatched walls, floor as `a` | many | 3.5% / 1.0% | 4 / 2 / 0 | |
+| `dd04_c` | dd04 | c | walls as `b`; herringbone, flagstone and tile floors | many | 3.5% / 1.0% | 4 / 2 / 0 | Dark ambient (`ff8b7777`), strong glows. Tile lines in the common room look like thin walls |
+| `dd04_d` | dd04 | d | grey stone walls, grey cobbled floor, **no grid, lighting off** | many | 3.5% / 1.0% | 4 / 2 / 0 | First export with `baked_lighting: false` and lights: `lights` is still filled |
 
 All `b`, `c` and `d` variants have the same walls and portals as their `a` (masks identical, except the
 1 px door in `dd01_b`). Share of pixels that change away from the walls, compared with `a`:
@@ -41,6 +45,9 @@ have their own floor and no grid.
 draws a lit light source (`dd01` has an unlit stove), so the empty list is the correct label. They
 stay as they are, as lights-free maps. From `dd04` on, the Lights column gives the count per tier
 (small / medium / large).
+
+`dd04` (21.10): Dungeondraft writes `range` in grid squares (a light set to 8 shows `"range": 8`),
+so the tier ranges stand. All four variants have identical walls, portals and lights.
 
 The next layouts, `dd04`–`dd13`, follow [map-specs.md](map-specs.md).
 

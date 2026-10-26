@@ -7,6 +7,8 @@ of war; visibility IoU measures what players actually see.
 
 - [ ] Run the pipeline on 2–3 real validation maps (at least one from each tool), upload the .dd2vtt files to Roll20,
       and time how long the manual fixes take. Note the times in `docs/results.md`.
+      Also check the bright and dim radius Roll20 gives each light tier, and adjust
+      `postprocess/configs/lights.toml` if it doesn't match `docs/labeling-rules.md`.
 - [ ] **Milestone:** first Roll20 import from a model prediction.
 
 ## Code

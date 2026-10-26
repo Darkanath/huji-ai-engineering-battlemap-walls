@@ -68,8 +68,10 @@ brightness comes from a fixed table. The GM can change the values in the app bef
   project choice. The label side (tier `range` and disc radius) is `LIGHT_TIERS` in
   `data/rasterize.py`; the output side (bright, dim, `range`, `intensity` written to the .dd2vtt,
   editable in the app) will be `postprocess/configs/lights.toml`. This page and both must agree.
-- How Roll20 turns a .dd2vtt light's `range` and `intensity` into bright and dim light is checked
-  by hand in week 2. The `range` column and the writer follow what that check finds.
+- **Roll20 check (21.10, `dd04_a`):** the export imports into Roll20 with every light in place,
+  and `range` is in grid squares, so the `range` column stands. The exact bright and dim radius
+  Roll20 makes from `range` and `intensity` was not measured; check it on the writer's output in
+  week 5 and adjust `postprocess/configs/lights.toml` if needed.
 - **Tier comes from `range`.** When you place a light in Dungeondraft, set its range to the
   tier's value in the last column. The rasterizer reads the tier back from `range` and stops with
   an error on a range that matches no tier, so a light placed with the default range is caught.

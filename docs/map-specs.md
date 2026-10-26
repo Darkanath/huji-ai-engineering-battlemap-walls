@@ -85,6 +85,114 @@ see the DA notes below.
   `dd01_a`); the other variants have `true`. Check on the first `d` export that `lights` is still
   filled with lighting off.
 
+### Export settings per variant
+
+The settings that change between variants are grid and lighting. Everything else is the same
+for all four exports of a layout.
+
+**Same for every export:**
+
+| Setting | Dungeondraft | Dungeon Alchemist |
+| --- | --- | --- |
+| Export type | Universal VTT (`.dd2vtt`) | Universal VTT (`.dd2vtt`) |
+| Scale | Grid preset **Roll20** (70 px per square) | **72 DPI** (72 px per square) |
+| Camera | Top-down (the only option) | **Orthographic (Top Down)** |
+| Map size | The layout's size (25×25 by default), whole map, no crop | Same |
+| Saved to | `data/raw/dungeondraft/ddNN_<v>.dd2vtt` | `data/raw/dungeon_alchemist/original/daNN_<v>.dd2vtt` |
+| Embedded image | PNG, about 1–3 MB per file | JPEG, about 0.9 MB per file |
+
+**What changes per variant:**
+
+| Variant | Grid | Dungeondraft lighting | DA lighting | Scene before export |
+| --- | --- | --- | --- | --- |
+| `a` | **On** | **On**, daylight ambient | **Lights in the image**, daytime | The base map |
+| `b` | **On** | **On**, same ambient as `a` | **Lights in the image**, same time as `a` | Walls restyled |
+| `c` | **On** | **On**, **dark** ambient (night or dungeon) | **Lights in the image**, **night** | Busy floor |
+| `d` | **Off** | **Off** (sprites only, no glow) | **Lights in VTT data only** | Third wall style, third floor |
+
+**Check the .dd2vtt after each export** (`python -m data.rasterize` prints most of it):
+
+| Check | Expected |
+| --- | --- |
+| `resolution.pixels_per_grid` | 70 (Dungeondraft) or 72 (DA) |
+| `resolution.map_size` | The layout's size, identical in `a`–`d` |
+| Embedded image size | `map_size` × `pixels_per_grid` px |
+| `environment.baked_lighting` | Dungeondraft: `true` in `a`–`c`, `false` in `d`. DA: always `true` (not reliable) |
+| Light count per tier (`lights small N, medium N, large N`) | Identical in `a`–`d`; after `retier_lights` for DA |
+| Wall and portal counts | Identical in `a`–`d` |
+| `objects_line_of_sight` | Empty in Dungeondraft (shadows off on every object); absent in DA |
+
+### How to export, step by step
+
+Dungeondraft is not installed where Claude can reach it, so its menu and field names here come
+from its documentation and may be worded a little differently in the app. The DA names are the
+ones from the `da01` pilot. If a name doesn't match, use the setting that does the same thing and
+fix this page.
+
+**Dungeondraft, one layout (`ddNN`):**
+
+1. **Before the first export:** select every object and turn off its **shadow** (otherwise the
+   object turns up in `objects_line_of_sight` as a wall). Check that every light is set to range
+   8, 12 or 16.
+2. **Variant `a`:** set the map up with the theme's walls and floor. In **Environmental
+   Lighting**, choose a daylight ambient (light color, high opacity).
+3. Open **File → Export**.
+4. Set **Export type** to **Universal VTT**.
+5. Pick the **Roll20** grid preset. The pixels per grid then reads **70**.
+6. **Grid on, Lighting on** for `a`, `b` and `c`. For `d`: **Grid off, Lighting off**.
+7. Export the whole map, with no region selected. Save as
+   `data/raw/dungeondraft/ddNN_a.dd2vtt` (on Windows: the repo folder under
+   `\\wsl$\Ubuntu\home\...\battlemap-walls\`).
+8. **Variant `b`:** change only the wall style (or the wall color, if the theme has a single
+   style). Repeat steps 3–7 and save as `ddNN_b.dd2vtt`.
+9. **Variant `c`:** change the floor to a busy pattern. Set Environmental Lighting to a dark
+   ambient (dark color, so the lights glow). Export as `ddNN_c.dd2vtt`.
+10. **Variant `d`:** switch to the third wall style and third floor. Export with **Grid off and
+    Lighting off**, as `ddNN_d.dd2vtt`.
+11. Never move a wall, door, window, light or object between variants. Save the
+    `.dungeondraft_map` after `a` (as `ddNN.dungeondraft_map`, kept outside `data/raw/`) so
+    you can go back to it.
+
+**Dungeon Alchemist, one layout (`daNN`):**
+
+1. **Before the first export:** fill the map (the building should cover most of the 25×25
+   squares). Don't move walls, doors or windows after the first export. Restyling or
+   re-rolling furniture between variants is fine.
+2. **Variant `a`:** set the room themes and materials. Set the time of day to **day**.
+3. Open **Export** and choose **Universal VTT (.dd2vtt)**.
+4. Set the camera to **Orthographic (Top Down)** and the resolution to **72 DPI**.
+5. **Grid on** and lights **in the image** for `a`, `b` and `c`. For `d`: **Grid off** and lights
+   **in VTT data only**.
+6. Save as `data/raw/dungeon_alchemist/original/daNN_a.dd2vtt`.
+7. **Variant `b`:** change the wall material only. Export as `daNN_b.dd2vtt` into `original/`.
+8. **Variant `c`:** choose a busy floor material and set the time of day to **night**. Export as
+   `daNN_c.dd2vtt`.
+9. **Variant `d`:** pick a third wall and floor material. Export with **Grid off** and lights
+   **in VTT data only**, as `daNN_d.dd2vtt`.
+10. Convert the lights (writes the files the manifest reads):
+
+    ```bash
+    docker compose run --rm app python -m data.retier_lights --source dungeon_alchemist \
+        data/raw/dungeon_alchemist/original/daNN_*.dd2vtt --out data/raw/dungeon_alchemist
+    ```
+
+    If it stops on an unknown light, add a rule for it in `data/configs/light_sources.toml` and
+    run it again.
+
+**After each layout (both tools):** check every variant, then rebuild the manifest:
+
+```bash
+docker compose run --rm app python -m data.rasterize data/raw/dungeondraft/ddNN_a.dd2vtt
+docker compose run --rm app python -m data.manifest
+```
+
+In each preview, check the colors: red on the walls, magenta on the doors and windows, yellow
+on the lit sources. The printed counts must match across `a`–`d` (the checks table above).
+Then add the layout to [map-log.md](map-log.md).
+
+The older exports `dd01`–`dd03` predate this table: only `dd01_a` was exported with lighting
+off, so their `d` variants still have glow (they have no lights, so this changes little).
+
 ## Dungeondraft
 
 Checked against the Dungeondraft documentation and the existing exports (21.10). Dungeondraft is
@@ -111,9 +219,8 @@ items in the app.
   lists caves separately from walls, so make sure they end up in `line_of_sight`. If they don't,
   `data/rasterize.py` needs to read them too.
 - **Curved walls** (`dd07`): the red band must follow the curve, not cut across it.
-- **Light range** (`dd04_a`): open the .dd2vtt and check that a light you set to 8 shows
-  `"range": 8`. If Dungeondraft's slider uses another unit, the tier ranges in `LIGHT_TIERS`
-  change, not the maps.
+- **Light range** (`dd04_a`): **confirmed 21.10.** A light set to 8 is stored as `"range": 8`
+  (grid squares), so `LIGHT_TIERS` stands. Lighting off in the export keeps the `lights` list.
 
 **Assets to find in the Default pack** (Objects tool, pack name "Default"; about 1,500–1,800
 objects). If one is missing, swap the item for one that exists rather than adding an asset pack:
