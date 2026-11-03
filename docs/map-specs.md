@@ -218,7 +218,8 @@ items in the app.
 - **Cave walls** (`dd05`): **confirmed 3.11.** Dungeondraft writes cave walls to
   `line_of_sight`, and the preview shows red along every cave wall, so `data/rasterize.py` needs
   no change.
-- **Curved walls** (`dd07`): the red band must follow the curve, not cut across it.
+- **Curved walls** (`dd07`): **confirmed 3.11.** The red band follows the round towers along the
+  curve.
 - **Light range** (`dd04_a`): **confirmed 21.10.** A light set to 8 is stored as `"range": 8`
   (grid squares), so `LIGHT_TIERS` stands. Lighting off in the export keeps the `lights` list.
 

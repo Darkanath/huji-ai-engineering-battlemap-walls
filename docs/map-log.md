@@ -42,6 +42,10 @@ All are 25×25 squares at 70 px per square.
 | `dd06_b` | dd06 | b | other cave wall style, floor as `a` | some | 7.2% / 0.2% | 3 / 3 / 0 | |
 | `dd06_c` | dd06 | c | other cave wall style, cracked stone floor, **dark ambient** (`ff8b7777`) | some | 7.2% / 0.2% | 3 / 3 / 0 | |
 | `dd06_d` | dd06 | d | other cave wall style, grey floor, **no grid, lighting off** | some | 7.2% / 0.2% | 3 / 3 / 0 | |
+| `dd07_a` | dd07 | a | thick stone, 4 round corner towers, grass courtyard | some | 7.8% / 0.8% | 3 / 2 / 1 | Castle keep. 17 portals: 2 portcullises in the gatehouse, 4 arrow slits (0.8 squares), a double door into the great hall (2 portals), 1 door on the small building, 8 tower doors. Fire pit in the courtyard is the first large light. Pillars and a table in the great hall; a post-and-rope fenced pen (not a wall). Unlit wall torches in 3 towers. No doorless gaps |
+| `dd07_b` | dd07 | b | other wall style | some | 7.8% / 0.8% | 3 / 2 / 1 | |
+| `dd07_c` | dd07 | c | other wall style and floors, **dark ambient** (`ff8b7777`) | some | 7.8% / 0.8% | 3 / 2 / 1 | |
+| `dd07_d` | dd07 | d | other wall style and floors, **no grid, lighting off** | some | 7.8% / 0.8% | 3 / 2 / 1 | |
 
 All `b`, `c` and `d` variants have the same walls and portals as their `a` (masks identical, except the
 1 px door in `dd01_b`). Share of pixels that change away from the walls, compared with `a`:
@@ -67,6 +71,10 @@ is a thin line across the opening, as wide as the wall (as in `dd04`), so the la
 than the drawing on every Dungeondraft door. Mine-cart rails, long and thin, carry no label.
 Split: train. With 6 layouts the Dungeondraft splits are 4 / 1 / 1; val gets its second layout as
 more come in.
+
+`dd07` (3.11): the round towers confirm that the wall band follows curved walls. The first export
+drew the fenced pen with the wall tool, so it came out as a closed wall loop; the re-export draws
+the fence without a wall (low fences block movement, not sight: not walls). Split: train.
 
 The next layouts, `dd04`–`dd13`, follow [map-specs.md](map-specs.md).
 
