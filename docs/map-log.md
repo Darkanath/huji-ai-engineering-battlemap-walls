@@ -46,6 +46,10 @@ All are 25×25 squares at 70 px per square.
 | `dd07_b` | dd07 | b | other wall style | some | 7.8% / 0.8% | 3 / 2 / 1 | |
 | `dd07_c` | dd07 | c | other wall style and floors, **dark ambient** (`ff8b7777`) | some | 7.8% / 0.8% | 3 / 2 / 1 | |
 | `dd07_d` | dd07 | d | other wall style and floors, **no grid, lighting off** | some | 7.8% / 0.8% | 3 / 2 / 1 | |
+| `dd08_a` | dd08 | a | stone, octagonal tower inside a thick stone outer wall, grass | some | 8.1% / 0.5% | 3 / 2 / 0 | Wizard tower: 45° walls, two curved rooms. 12 portals, all diagonal: 8 on the outer faces (4 doors 1 square, 4 windows 0.75 squares), 4 interior doors. Outer wall has 2 doorless gaps. Potion shelf with no light (glow, not a light); 1 unlit lantern. The medium light in the center sits on a small floor sprite, smaller than its label disc |
+| `dd08_b` | dd08 | b | other wall style | some | 8.1% / 0.5% | 3 / 2 / 0 | |
+| `dd08_c` | dd08 | c | brick walls, brown floor, **dark ambient** (`ff8b7777`) | some | 8.1% / 0.5% | 3 / 2 / 0 | |
+| `dd08_d` | dd08 | d | grey stone walls, blue-grey floor, **no grid, lighting off** | some | 8.1% / 0.5% | 3 / 2 / 0 | |
 
 All `b`, `c` and `d` variants have the same walls and portals as their `a` (masks identical, except the
 1 px door in `dd01_b`). Share of pixels that change away from the walls, compared with `a`:
@@ -75,6 +79,10 @@ more come in.
 `dd07` (3.11): the round towers confirm that the wall band follows curved walls. The first export
 drew the fenced pen with the wall tool, so it came out as a closed wall loop; the re-export draws
 the fence without a wall (low fences block movement, not sight: not walls). Split: train.
+
+`dd08` (3.11): diagonal walls and portals at 45° label cleanly: the bands follow the walls. Split:
+train, which makes the Dungeondraft splits 6 / 1 / 1 with `dd04`–`dd08` done. By the split rule
+the next layout (`dd09`) goes to val.
 
 The next layouts, `dd04`–`dd13`, follow [map-specs.md](map-specs.md).
 
