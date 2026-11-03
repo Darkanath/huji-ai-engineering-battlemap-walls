@@ -38,6 +38,10 @@ All are 25×25 squares at 70 px per square.
 | `dd05_b` | dd05 | b | orange-rimmed cave wall style, floor as `a` | few | 8.3% / 0.0% | 2 / 2 / 0 | |
 | `dd05_c` | dd05 | c | grey rubble cave walls, cracked stone floor | few | 8.3% / 0.0% | 2 / 2 / 0 | The rubble is drawn outside the cave line, so the wall band covers its inner edge |
 | `dd05_d` | dd05 | d | solid black cave walls, sand floor, **no grid, lighting off** | few | 8.3% / 0.0% | 2 / 2 / 0 | |
+| `dd06_a` | dd06 | a | cave walls (grey rock), carved stone side room with flagstone floor | some | 7.2% / 0.2% | 3 / 3 / 0 | Mine: rail tunnels leaving the map on three sides, a junction, 2 ore carts, crates. 4 portals: a double gate (2 squares) on the rails, 2 cave doors, 1 door at the left map edge. Unlit: a lantern and a brazier. Purple crystals with no light (glow, not a light). Two cave-wall dots under 0.1 square at (18, 20) and (18.9, 14.7), invisible |
+| `dd06_b` | dd06 | b | other cave wall style, floor as `a` | some | 7.2% / 0.2% | 3 / 3 / 0 | |
+| `dd06_c` | dd06 | c | other cave wall style, cracked stone floor, **dark ambient** (`ff8b7777`) | some | 7.2% / 0.2% | 3 / 3 / 0 | |
+| `dd06_d` | dd06 | d | other cave wall style, grey floor, **no grid, lighting off** | some | 7.2% / 0.2% | 3 / 3 / 0 | |
 
 All `b`, `c` and `d` variants have the same walls and portals as their `a` (masks identical, except the
 1 px door in `dd01_b`). Share of pixels that change away from the walls, compared with `a`:
@@ -56,6 +60,13 @@ so the tier ranges stand. All four variants have identical walls, portals and li
 `dd05` (3.11): the first cave map. Dungeondraft writes cave walls to `line_of_sight` (7 polylines,
 `objects_line_of_sight` empty), so the rasterizer reads them with no change. Wall share 8.3%,
 higher than the building maps (3.5–5.4%), because cave outlines are long and winding. Split: train.
+
+`dd06` (3.11): the first export put three doors in as hairlines, with almost nothing drawn at the
+map edge; the re-export draws a door there and adds a carved stone room. Dungeondraft's door art
+is a thin line across the opening, as wide as the wall (as in `dd04`), so the label band is wider
+than the drawing on every Dungeondraft door. Mine-cart rails, long and thin, carry no label.
+Split: train. With 6 layouts the Dungeondraft splits are 4 / 1 / 1; val gets its second layout as
+more come in.
 
 The next layouts, `dd04`–`dd13`, follow [map-specs.md](map-specs.md).
 
