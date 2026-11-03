@@ -46,7 +46,7 @@ All are 25×25 squares at 70 px per square.
 | `dd07_b` | dd07 | b | other wall style | some | 7.8% / 0.8% | 3 / 2 / 1 | |
 | `dd07_c` | dd07 | c | other wall style and floors, **dark ambient** (`ff8b7777`) | some | 7.8% / 0.8% | 3 / 2 / 1 | |
 | `dd07_d` | dd07 | d | other wall style and floors, **no grid, lighting off** | some | 7.8% / 0.8% | 3 / 2 / 1 | |
-| `dd08_a` | dd08 | a | stone, octagonal tower inside a thick stone outer wall, grass | some | 8.1% / 0.5% | 3 / 2 / 0 | Wizard tower: 45° walls, two curved rooms. 12 portals, all diagonal: 8 on the outer faces (4 doors 1 square, 4 windows 0.75 squares), 4 interior doors. Outer wall has 2 doorless gaps. Potion shelf with no light (glow, not a light); 1 unlit lantern. The medium light in the center sits on a small floor sprite, smaller than its label disc |
+| `dd08_a` | dd08 | a | stone, octagonal tower inside a thick stone outer wall, grass | some | 8.1% / 0.5% | 3 / 2 / 0 | Wizard tower: 45° walls, two curved rooms. 12 portals, all diagonal: 8 on the outer faces (4 doors 1 square, 4 windows 0.75 squares), 4 interior doors. Outer wall has 2 doorless gaps. Potion shelf with no light (glow, not a light); 1 unlit lantern. The medium light in the center is a floor lantern (confirmed), a small sprite inside its label disc |
 | `dd08_b` | dd08 | b | other wall style | some | 8.1% / 0.5% | 3 / 2 / 0 | |
 | `dd08_c` | dd08 | c | brick walls, brown floor, **dark ambient** (`ff8b7777`) | some | 8.1% / 0.5% | 3 / 2 / 0 | |
 | `dd08_d` | dd08 | d | grey stone walls, blue-grey floor, **no grid, lighting off** | some | 8.1% / 0.5% | 3 / 2 / 0 | |
