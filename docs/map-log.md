@@ -34,6 +34,10 @@ All are 25×25 squares at 70 px per square.
 | `dd04_b` | dd04 | b | thin dark hatched walls, floor as `a` | many | 3.5% / 1.0% | 4 / 2 / 0 | |
 | `dd04_c` | dd04 | c | walls as `b`; herringbone, flagstone and tile floors | many | 3.5% / 1.0% | 4 / 2 / 0 | Dark ambient (`ff8b7777`), strong glows. Tile lines in the common room look like thin walls |
 | `dd04_d` | dd04 | d | grey stone walls, grey cobbled floor, **no grid, lighting off** | many | 3.5% / 1.0% | 4 / 2 / 0 | First export with `baked_lighting: false` and lights: `lights` is still filled |
+| `dd05_a` | dd05 | a | cave walls (grey rock), masonry side room | few | 8.3% / 0.0% | 2 / 2 / 0 | Natural cave: 5 chambers, winding passages, many open gaps, underground pool; 1 door into the masonry room (portal share 0.05%). Boulders, stalagmites, burnt-out campfire (no light). A stray cave-wall dot (0.2 squares) at (18.5, 10.7), drawn and labeled as wall |
+| `dd05_b` | dd05 | b | orange-rimmed cave wall style, floor as `a` | few | 8.3% / 0.0% | 2 / 2 / 0 | |
+| `dd05_c` | dd05 | c | grey rubble cave walls, cracked stone floor | few | 8.3% / 0.0% | 2 / 2 / 0 | The rubble is drawn outside the cave line, so the wall band covers its inner edge |
+| `dd05_d` | dd05 | d | solid black cave walls, sand floor, **no grid, lighting off** | few | 8.3% / 0.0% | 2 / 2 / 0 | |
 
 All `b`, `c` and `d` variants have the same walls and portals as their `a` (masks identical, except the
 1 px door in `dd01_b`). Share of pixels that change away from the walls, compared with `a`:
@@ -48,6 +52,10 @@ stay as they are, as lights-free maps. From `dd04` on, the Lights column gives t
 
 `dd04` (21.10): Dungeondraft writes `range` in grid squares (a light set to 8 shows `"range": 8`),
 so the tier ranges stand. All four variants have identical walls, portals and lights.
+
+`dd05` (3.11): the first cave map. Dungeondraft writes cave walls to `line_of_sight` (7 polylines,
+`objects_line_of_sight` empty), so the rasterizer reads them with no change. Wall share 8.3%,
+higher than the building maps (3.5–5.4%), because cave outlines are long and winding. Split: train.
 
 The next layouts, `dd04`–`dd13`, follow [map-specs.md](map-specs.md).
 

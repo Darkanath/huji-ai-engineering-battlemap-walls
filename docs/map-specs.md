@@ -215,9 +215,9 @@ items in the app.
 
 **Check on the first export that uses them:**
 
-- **Cave walls** (`dd05`): the rasterizer preview must show red along the cave walls. The format
-  lists caves separately from walls, so make sure they end up in `line_of_sight`. If they don't,
-  `data/rasterize.py` needs to read them too.
+- **Cave walls** (`dd05`): **confirmed 3.11.** Dungeondraft writes cave walls to
+  `line_of_sight`, and the preview shows red along every cave wall, so `data/rasterize.py` needs
+  no change.
 - **Curved walls** (`dd07`): the red band must follow the curve, not cut across it.
 - **Light range** (`dd04_a`): **confirmed 21.10.** A light set to 8 is stored as `"range": 8`
   (grid squares), so `LIGHT_TIERS` stands. Lighting off in the export keeps the `lights` list.
