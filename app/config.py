@@ -71,12 +71,14 @@ class AppLimits(BaseModel):
     default_height: int = Field(ge=1)
     export_ppg: int = Field(gt=0)
     export_jpeg_quality: int = Field(ge=1, le=100)
+    detect_size_default: bool = False  # the detect option's state for a new upload
 
 
 class SizeStep(BaseModel):
     """Which profile's model works out the map size, in both passes."""
 
     profile: Literal["quick", "deep"]
+    expected_cost_usd: float = Field(ge=0)
 
 
 class Settings(BaseModel):

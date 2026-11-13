@@ -31,6 +31,7 @@ expected_cost_usd = 0.32
 # on 3 of 3 grid maps and Sonnet on 1 of 3 (docs/results.md). Its cost is part of each pass.
 [size_step]
 profile = "deep"
+expected_cost_usd = 0.03     # one Opus request, for llm.run --size-only
 
 [limits]
 max_turns = 24             # API calls per map
@@ -80,3 +81,6 @@ default_width = 25
 default_height = 25
 export_ppg = 70              # Roll20's default pixels per square
 export_jpeg_quality = 90
+# "Detect map size from the image" starts off: detection adds about $0.03 (one Opus request)
+# to a pass and missed on a map with a faint grid (docs/results.md, 13.11). The user ticks it.
+detect_size_default = false

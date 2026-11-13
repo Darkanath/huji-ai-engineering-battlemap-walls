@@ -19,13 +19,13 @@ from app import exporter, render
 from app.config import Settings
 from app.domain import MapSize, MapSizeSource, PassKind, TraceResult
 from app.errors import (
-    DETECTED,
     EMPTY_MASK,
     NO_GRID,
     NOT_SQUARE,
     MapSizeInvalid,
     PassFailure,
     UploadRejected,
+    detected_note,
     message,
 )
 from app.logging import log_event
@@ -46,7 +46,7 @@ class Session:
     map_size: MapSize
     token: str = field(default_factory=lambda: uuid.uuid4().hex)
     size_source: MapSizeSource = MapSizeSource.default
-    detect_size: bool = True
+    detect_size: bool = False  # set from [app] detect_size_default by prepare()
     size_note: str = ""  # "Detected from the image", no grid found, or the proportions warning
     size_version: int = 0  # goes up whenever the user types a size
     result: TraceResult | None = None
@@ -97,6 +97,7 @@ def prepare(path: str | Path, settings: Settings) -> Session:
         image_name=path.stem,
         tmp_dir=Path(tempfile.mkdtemp(prefix="battlemap-")),
         map_size=MapSize(width=app.default_width, height=app.default_height),
+        detect_size=app.detect_size_default,
     )
 
 
@@ -199,7 +200,8 @@ def finish_pass(
         session.map_size = outcome.traced_size
         session.size_source = MapSizeSource.detected
         session.detect_size = False
-        session.size_note = DETECTED
+        size = outcome.traced_size
+        session.size_note = detected_note(size.width, size.height, session.image.width)
     elif outcome.size_source == MapSizeSource.not_found:
         session.size_source = MapSizeSource.not_found
         session.size_note = NO_GRID

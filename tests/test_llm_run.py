@@ -92,3 +92,13 @@ def test_estimate_follows_a_model_override(setup, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "about $0.64" in out  # $0.32 x (40 / 20), Fable's output price over Opus's
     assert "effort changes are not included" in out
+
+
+def test_size_only_runs_one_request_per_map_and_records_it(setup):
+    """--size-only asks only for the map size and writes size.json and a summary row."""
+    out, client = setup
+    run.main([*ARGS, "--yes", "--size-only"])
+    assert len(client.requests) == 1
+    assert (out / "demo" / "size.json").exists() and not (out / "demo" / "trace.json").exists()
+    row = next(csv.DictReader((out / "summary.csv").open()))
+    assert row["detected_size"] == "3x3" and row["true_size"] == "25x25"

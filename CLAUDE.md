@@ -48,7 +48,9 @@ Final presentation: 2026-12-23.
 - **The API key lives in `.env`** (`ANTHROPIC_API_KEY`, gitignored, read by Docker Compose). Never
   commit, log or display it; the app never asks the user for it.
 - **Grid detection is in scope, and the model does it.** As part of a pass the user started,
-  the vision model works out the map's size in squares and the app fills it in; the user can
+  the vision model works out the map's size in squares and the app fills it in, when the user
+  ticks "Detect map size from the image" (off by default since 13.11: about $0.03 per pass,
+  and unreliable on faint grids); the user can
   always change it, and a typed size wins. There is no local grid detector and no separate or
   automatic paid call for it. If no grid is found, the pass uses the size in the fields and says
   so.

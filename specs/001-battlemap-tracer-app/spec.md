@@ -231,8 +231,9 @@ features as before.
 - **FR-003**: The app MUST let the user enter the map size as width and height in grid
   squares, pre-filled with 25 x 25, each a whole number from 1 to 200, and MUST NOT start a
   pass that would use a value outside that range.
-- **FR-004**: The app MUST offer a "detect map size from the image" option, on by default
-  for every new upload. When a pass runs with the option on, the model MUST work out the
+- **FR-004**: The app MUST offer a "detect map size from the image" option, off by default
+  for every new upload (a config value; changed from on by default on 13.11, because it adds
+  about $0.03 per pass and missed on a map with a faint grid). When a pass runs with the option on, the model MUST work out the
   map's size in squares from the image as part of that pass, and the app MUST fill in the map
   size fields with it, say that it was detected, and use it for the mask.
 - **FR-004a**: When the model finds no square grid, or finds a size outside 1 to 200, the

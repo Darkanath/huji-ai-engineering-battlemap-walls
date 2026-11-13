@@ -9,8 +9,8 @@ What the user sees and can do. One Gradio page; `app/main.py` only wires these c
 | --- | --- | --- |
 | Upload | Accepts `.png`, `.jpg`/`.jpeg`, `.webp`, up to 20 MB. Notice beside it: "Your image is sent to Anthropic, a third-party AI provider, for analysis." | Always |
 | Map width, map height | Whole numbers 1 to 200, pre-filled 25 and 25 | Always |
-| Detect map size from the image | Checkbox, on for every new upload; turns off when the user types a size or a size is detected | Always |
-| Map size note | "Detected from the image", "No grid found: check the map size", or the proportions warning | Shown when it applies |
+| Detect map size from the image | Checkbox, off for every new upload (`[app] detect_size_default`); its label shows the added cost; turns off when the user types a size or a size is detected | Always |
+| Map size note | "Detected from the image: W x H squares, N px per square. Check this against the map's grid; correcting it costs nothing.", the no-grid message, or the proportions warning | Shown when it applies |
 | Suggest walls | Label includes the expected time and cost from the config, e.g. "about 25 s, about $0.10" | An image is loaded and no pass is running |
 | Deeper examination | Label includes the expected time and cost from the config, e.g. "about 70 s, about $0.32" | A mask is on screen and no pass is running |
 | Deep-pass note | "The fast pass handles ordinary buildings well but often misses cave outlines and doors in castles and other complex structures. The deeper examination fixes most of that." | Always visible |
@@ -57,7 +57,7 @@ keeps showing the last successful pass.
 
 ## Behaviour rules
 
-- A new upload clears the image, mask, status and messages, turns the detect option on,
+- A new upload clears the image, mask, status and messages, resets the detect option to its default (off),
   resets the map size to 25 x 25 and drops the result of any pass still running.
 - While a pass runs, both pass buttons are disabled; the mask on screen stays and can be
   accepted.

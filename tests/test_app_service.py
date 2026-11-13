@@ -20,7 +20,6 @@ from app.domain import (
     Wall,
 )
 from app.errors import (
-    DETECTED,
     EARLIER_MASK,
     EMPTY_MASK,
     NO_GRID,
@@ -98,13 +97,13 @@ def run(session, outcome, kind=QUICK) -> service.PassTicket:
 
 @pytest.mark.parametrize("suffix", [".png", ".jpg", ".jpeg", ".webp", ".PNG"])
 def test_prepare_accepts_the_three_image_types(tmp_path, settings, suffix):
-    """Each allowed type gives a fresh session: 25 x 25, detect on, no mask."""
+    """Each allowed type gives a fresh session: 25 x 25, detect off (config), no mask."""
     path = tmp_path / f"map{suffix}"
     fmt = {".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG", ".webp": "WEBP"}[suffix.lower()]
     Image.new("RGB", (100, 100)).save(path, format=fmt)
     s = service.prepare(path, settings)
     assert s.map_size == MapSize(width=25, height=25) and s.size_source == MapSizeSource.default
-    assert s.detect_size and s.result is None and s.token and s.tmp_dir.is_dir()
+    assert not s.detect_size and s.result is None and s.token and s.tmp_dir.is_dir()
     service.close(s)
 
 
@@ -284,35 +283,49 @@ def test_export_works_while_a_pass_runs(session):
 # --- Map size worked out by the model (US4) ------------------------------------------------
 
 
-def test_detect_option_sends_no_size(session):
+@pytest.fixture
+def detecting(session):
+    """A session with "detect map size from the image" ticked (it starts off)."""
+    service.set_detect(session, True)
+    return session
+
+
+def test_detect_option_starts_off_and_sends_the_typed_size(session):
+    """By default no detection runs: the ticket carries the size in the fields."""
+    assert not session.detect_size
+    assert service.begin_pass(session, QUICK).map_size == MapSize(width=25, height=25)
+
+
+def test_detect_option_sends_no_size(session, detecting):
     """With detection on, the ticket carries no size and the fields as fallback."""
     ticket = service.begin_pass(session, QUICK)
     assert ticket.map_size is None and ticket.fallback_size == MapSize(width=25, height=25)
 
 
-def test_detected_size_fills_the_fields(session):
+def test_detected_size_fills_the_fields(session, detecting):
     """A detected size is applied, marked, and the option turns off."""
     run(session, make_result(size=MapSize(width=26, height=28), source=MapSizeSource.detected))
     assert session.map_size == MapSize(width=26, height=28)
     assert session.size_source == MapSizeSource.detected
-    assert not session.detect_size and session.size_note == DETECTED
+    assert not session.detect_size
+    assert session.size_note.startswith("Detected from the image: 26 x 28 squares, 26.9 px")
 
 
-def test_no_grid_keeps_the_size_and_says_so(session):
+def test_no_grid_keeps_the_size_and_says_so(session, detecting):
     """No grid found: the size stays, and the note explains."""
     run(session, make_result(source=MapSizeSource.not_found))
     assert session.map_size == MapSize(width=25, height=25)
     assert session.size_note == NO_GRID
 
 
-def test_typed_size_turns_detection_off(session):
+def test_typed_size_turns_detection_off(session, detecting):
     """Typing a size switches detection off; the next ticket carries that size."""
     service.set_map_size(session, 30, 30)
     assert not session.detect_size
     assert service.begin_pass(session, QUICK).map_size == MapSize(width=30, height=30)
 
 
-def test_size_typed_during_a_pass_wins_over_the_detected_one(session):
+def test_size_typed_during_a_pass_wins_over_the_detected_one(session, detecting):
     """A size typed while the pass ran is not overwritten."""
     ticket = service.begin_pass(session, QUICK)
     service.set_map_size(session, 30, 30)
@@ -322,7 +335,7 @@ def test_size_typed_during_a_pass_wins_over_the_detected_one(session):
     assert session.size_source == MapSizeSource.typed
 
 
-def test_deep_after_detection_uses_the_size_on_screen(session):
+def test_deep_after_detection_uses_the_size_on_screen(session, detecting):
     """After a detection, a deep pass traces on the detected size unless detection is asked."""
     run(session, make_result(size=MapSize(width=26, height=28), source=MapSizeSource.detected))
     ticket = service.begin_pass(session, DEEP)
@@ -332,7 +345,7 @@ def test_deep_after_detection_uses_the_size_on_screen(session):
     assert service.begin_pass(session, DEEP).map_size is None
 
 
-def test_failed_pass_leaves_the_size_alone(session):
+def test_failed_pass_leaves_the_size_alone(session, detecting):
     """A failure changes neither the size nor the option."""
     run(session, failure())
     assert session.map_size == MapSize(width=25, height=25) and session.detect_size
@@ -363,7 +376,7 @@ def test_invalid_size_is_refused_and_changes_nothing(session, w, h):
     with pytest.raises(MapSizeInvalid) as err:
         service.set_map_size(session, w, h)
     assert err.value.message == "Map width and height must be whole numbers from 1 to 200."
-    assert session.map_size == MapSize(width=25, height=25) and session.detect_size
+    assert session.map_size == MapSize(width=25, height=25) and session.size_source == "default"
 
 
 def test_whole_float_size_is_accepted(session):
@@ -387,7 +400,9 @@ def test_result_for_a_cleared_session_is_dropped(session):
 
 def test_no_grid_note_only_after_a_pass_that_looked(session):
     """A pass with a given size never sets the no-grid note, even after an earlier one did."""
+    service.set_detect(session, True)
     run(session, make_result(source=MapSizeSource.not_found))
+    assert session.size_note == NO_GRID
     session.size_note = ""
     service.set_detect(session, False)
     stale = make_result(source=MapSizeSource.not_found)  # the source the ticket carried

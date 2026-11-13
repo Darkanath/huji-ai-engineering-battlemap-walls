@@ -8,7 +8,7 @@ names are settled in implementation.
 
 | Function | Does | Model call |
 | --- | --- | --- |
-| `prepare(path, settings) -> Session` | Checks the extension (`.png`, `.jpg`, `.jpeg`, `.webp`), the size (up to `max_upload_mb`) and that the file opens as an image. Returns a fresh `Session`: RGB image, new token, map size 25 x 25 (`default`), detect option on, no mask, new temp folder. Raises `UploadRejected` otherwise | None |
+| `prepare(path, settings) -> Session` | Checks the extension (`.png`, `.jpg`, `.jpeg`, `.webp`), the size (up to `max_upload_mb`) and that the file opens as an image. Returns a fresh `Session`: RGB image, new token, map size 25 x 25 (`default`), detect option at `[app] detect_size_default` (off), no mask, new temp folder. Raises `UploadRejected` otherwise | None |
 | `set_map_size(session, width, height)` | Validates 1..200 whole numbers (raises `MapSizeInvalid`). Sets the size with source `typed` and turns the detect option off. Returns the proportions warning, if any | None |
 | `set_detect(session, on)` | Turns the detect option on or off | None |
 | `can_start(session, kind) -> bool` | `quick`: an image is loaded and nothing is running. `deep`: also a mask is on screen | None |

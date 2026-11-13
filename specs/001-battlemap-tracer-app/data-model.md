@@ -98,7 +98,7 @@ One `Session` per browser session, held in `gr.State`. A plain mutable object.
 | `image_name` | `str` | Base name for the download |
 | `map_size` | `MapSize` | What the fields show |
 | `size_source` | `MapSizeSource` | |
-| `detect_size` | `bool` | The option; on for a new upload, off once the user types or a size is detected |
+| `detect_size` | `bool` | The option; off for a new upload (config), turned on by the user, off again once the user types or a size is detected |
 | `result` | `TraceResult` or `None` | The mask on screen |
 | `last_failure` | `PassFailure` or `None` | For the message area |
 | `running` | `PassKind` or `None` | A pass in flight |

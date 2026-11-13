@@ -106,5 +106,16 @@ NO_GRID = (
     "No grid was found in the image, so the map size shown was used. Check it and correct it "
     "if needed; that costs nothing."
 )
-DETECTED = "Detected from the image"
+DETECTED = (
+    "Detected from the image: {width} x {height} squares, {px:g} px per square. "
+    "Check this against the map's grid; correcting it costs nothing."
+)
+
+
+def detected_note(width: int, height: int, image_width: int) -> str:
+    """The note for a detected size, with the square size it implies, so a wrong count
+    (for example 40 px squares on a 64 px grid) is easy to spot."""
+    return DETECTED.format(width=width, height=height, px=round(image_width / width, 1))
+
+
 NOT_SQUARE = "With this map size the grid squares would not be square. Check the width and height."

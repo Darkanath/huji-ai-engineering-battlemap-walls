@@ -3,6 +3,7 @@
     python -m llm.run --reference --profile quick --detect-size   (the committed reference maps)
     python -m llm.run --maps dd07_a dd06_a --profile deep --run opus   (maps from the manifest)
     python -m llm.run --image data/test/map-26x28.jpeg --squares 26 28 --run tavern
+    python -m llm.run --reference --size-only    (only the map-size step, about $0.03 per map)
 
 Paid: before the first call it prints the number of maps and the estimated cost and asks to
 continue (skip with --yes). Each map gets a folder runs/<run>/<map>/ with answer.json, the
@@ -142,6 +143,22 @@ def score_row(uvtt: dict, label: dict) -> dict:
     return row
 
 
+def size_row(out: Path, job: Job, detected, trace: Trace, seconds: float) -> dict:
+    """Save one map's size-step responses to size.json and return its summary row."""
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "size.json").write_text(json.dumps(trace.responses, indent=1))
+    return {
+        "map": job.name,
+        "model": sorted(trace.served_by)[0] if trace.served_by else "",
+        "stopped": trace.stopped,
+        "true_size": f"{job.size[0]}x{job.size[1]}",
+        "detected_size": f"{detected[0]}x{detected[1]}" if detected else "none",
+        "size_right": detected == tuple(job.size),
+        "size_cost_usd": round(trace.cost_usd, 3),
+        "seconds": round(seconds, 1),
+    }
+
+
 def main(argv: list[str] | None = None) -> None:
     """Command-line entry point."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -154,6 +171,11 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--model", help="override the profile's model")
     ap.add_argument("--effort", help="override the profile's effort")
     ap.add_argument("--detect-size", action="store_true", help="let the model find the map size")
+    ap.add_argument(
+        "--size-only",
+        action="store_true",
+        help="run only the map-size step (no tracing); implies --detect-size",
+    )
     ap.add_argument("--yes", action="store_true", help="skip the cost confirmation")
     ap.add_argument("--redo", action="store_true", help="trace maps again even if already done")
     ap.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
@@ -173,7 +195,9 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     run_dir = RUNS / (args.run or f"{datetime.now():%Y%m%d-%H%M%S}_{args.profile}")
-    todo = [j for j in jobs if args.redo or not (run_dir / j.name / "trace.json").exists()]
+    args.detect_size = args.detect_size or args.size_only
+    marker = "size.json" if args.size_only else "trace.json"
+    todo = [j for j in jobs if args.redo or not (run_dir / j.name / marker).exists()]
     for job in jobs:
         if job not in todo:
             print(f"{job.name}: already traced, skipping (use --redo)")
@@ -185,7 +209,12 @@ def main(argv: list[str] | None = None) -> None:
             f"The estimate is the {args.profile} profile's measured cost, scaled to "
             f"{cfg['model']['name']}'s token price; effort changes are not included."
         )
-    if not confirm(len(todo), estimate_per_map(cfg, args.profile), args.yes, note):
+    per_map = (
+        size_step_config()["size_step"]["expected_cost_usd"]
+        if args.size_only
+        else estimate_per_map(cfg, args.profile)
+    )
+    if not confirm(len(todo), per_map, args.yes, note):
         print("Stopped; nothing was sent.")
         return
 
@@ -200,6 +229,10 @@ def main(argv: list[str] | None = None) -> None:
             # The same size step as the app: the [size_step] profile's model, priced as such.
             detected = detect_map_size(job.image, size_step_config(), client, trace)
         size_cost = trace.cost_usd
+        if args.size_only:
+            summary.append(size_row(out, job, detected, trace, time.time() - start))
+            print(", ".join(f"{k} {v}" for k, v in summary[-1].items()))
+            continue
         # Always traced and scored on the true size, so scores stay comparable across runs.
         trace_map(job.image, job.size, cfg, client, views_dir=out / "views", trace=trace)
         uvtt = save_map(out, job.name, job.image, job.size, trace, time.time() - start)
@@ -234,7 +267,8 @@ def main(argv: list[str] | None = None) -> None:
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
         writer.writerows(allrows)
-    print(f"total estimated cost this call: ${sum(r['cost_usd'] for r in summary):.2f}")
+    total = sum(r.get("cost_usd", r.get("size_cost_usd", 0)) for r in summary)
+    print(f"total estimated cost this call: ${total:.2f}")
     print(f"run folder: {run_dir}")
 
 

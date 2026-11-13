@@ -99,7 +99,7 @@ def view(holder: Holder) -> tuple:
         s.size_note if s is not None else "",
         s.map_size.width if s is not None else SETTINGS.app.default_width,
         s.map_size.height if s is not None else SETTINGS.app.default_height,
-        s.detect_size if s is not None else True,
+        s.detect_size if s is not None else SETTINGS.app.detect_size_default,
         gr.Button(labels[PassKind.quick], interactive=service.can_start(s, PassKind.quick)),
         gr.Button(labels[PassKind.deep], interactive=service.can_start(s, PassKind.deep)),
         gr.DownloadButton("Accept mask", value=download, interactive=download is not None),
@@ -308,7 +308,13 @@ def build_ui(settings: Settings) -> gr.Blocks:
                         label="Map height (squares)",
                         precision=0,
                     )
-                detect = gr.Checkbox(True, label="Detect map size from the image")
+                detect = gr.Checkbox(
+                    app.detect_size_default,
+                    label=(
+                        "Detect map size from the image (adds about "
+                        f"${settings.size_step.expected_cost_usd:.2f} to the pass)"
+                    ),
+                )
                 size_note = gr.Markdown()
                 quick = gr.Button(labels[PassKind.quick], variant="primary", interactive=False)
                 deep = gr.Button(labels[PassKind.deep], interactive=False)

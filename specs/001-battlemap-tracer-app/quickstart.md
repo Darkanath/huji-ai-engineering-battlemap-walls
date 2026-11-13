@@ -35,7 +35,7 @@ docker compose run --rm --service-ports app python -m app.main
 ```
 
 Open `http://localhost:7860`. Expected before any upload: map size 25 x 25, "detect map
-size from the image" on, "Suggest walls" and "Deeper examination" disabled, "Accept mask"
+size from the image" off (its label shows the added cost), "Suggest walls" and "Deeper examination" disabled, "Accept mask"
 visible and disabled, the third-party notice beside the upload, and each pass button
 showing its expected time and cost.
 
@@ -78,10 +78,12 @@ Paid steps are marked. The whole list costs about $0.60.
 ### D. Map size worked out by the model (User Story 4) — paid, about $0.10 each
 
 1. Upload a map with a visible grid (for example the image of `data/reference/dd04_a.dd2vtt`;
-   `data/test/map-26x28.jpeg` has no grid lines) and leave the map size alone. Click "Suggest walls".
+   `data/test/map-26x28.jpeg` has no grid lines), tick "Detect map size from the image" and
+   leave the map size alone. Click "Suggest walls".
 2. Expected: the fields show the size the model found, with "Detected from the image"; the
    option is now off.
-3. Upload a map with no grid (for example `data/reference/dd04_d.dd2vtt`'s image). Click
+3. Upload a map with no grid (for example `data/reference/dd04_d.dd2vtt`'s image), tick the
+   option again. Click
    "Suggest walls".
 4. Expected: the mask is shown on 25 x 25 with the "No grid was found" message.
 
