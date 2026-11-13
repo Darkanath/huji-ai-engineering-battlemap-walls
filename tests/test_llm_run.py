@@ -83,3 +83,12 @@ def test_traced_map_is_skipped_without_redo(setup):
     sent = len(client.requests)
     run.main([*ARGS, "--yes"])
     assert len(client.requests) == sent
+
+
+def test_estimate_follows_a_model_override(setup, monkeypatch, capsys):
+    """With --model, the printed estimate is scaled to that model's price, with a note."""
+    monkeypatch.setattr("sys.stdin", io.StringIO("n\n"))
+    run.main([*ARGS, "--model", "claude-fable-5-2"])
+    out = capsys.readouterr().out
+    assert "about $0.64" in out  # $0.32 x (40 / 20), Fable's output price over Opus's
+    assert "effort changes are not included" in out

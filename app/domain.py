@@ -153,7 +153,7 @@ class RawArc(BaseModel):
 
     cx: float
     cy: float
-    r: float = Field(gt=0)
+    r: float  # a radius <= 0 is dropped in answer_to_fractions, not a reason to reject the answer
     start_deg: float
     end_deg: float
 
@@ -190,8 +190,8 @@ def answer_to_fractions(
     """Convert an answer in grid squares to image fractions.
 
     `traced_size` is the map size the trace used and `image_size` the image's (width, height)
-    in pixels. Arcs become polylines first; walls with fewer than 2 points and portals whose
-    ends coincide are dropped.
+    in pixels. Arcs become polylines first; arcs with a radius of 0 or less, walls with fewer
+    than 2 points and portals whose ends coincide are dropped.
     """
     image_w, image_h = image_size
     ppg = image_w / traced_size.width
@@ -201,7 +201,7 @@ def answer_to_fractions(
         return Point(fx=x / traced_size.width, fy=y * ppg / image_h)
 
     lines = [[(p.x, p.y) for p in w.points] for w in raw.walls]
-    for a in raw.arcs:
+    for a in (arc for arc in raw.arcs if arc.r > 0):
         lines.append(
             [(p["x"], p["y"]) for p in arc_points(a.cx, a.cy, a.r, a.start_deg, a.end_deg)]
         )

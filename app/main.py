@@ -63,9 +63,12 @@ class Holder:
     """
 
     def __init__(self) -> None:
-        """Start with no upload and no notice."""
+        """Start with no upload, no notice, and the size fields untouched."""
         self.session: service.Session | None = None
         self.notice = ""
+        # True once the user types in a size field, even the value already shown: a typed
+        # size wins over detection, so confirming 25 x 25 by typing it must count.
+        self.size_touched = False
 
 
 def _close(holder: Holder) -> None:
@@ -81,7 +84,11 @@ def view(holder: Holder) -> tuple:
     running = s is not None and s.running is not None
     download = None
     if s is not None and s.result is not None:
-        download = str(service.export(s))
+        try:
+            download = str(service.export(s))
+        except Exception as error:  # noqa: BLE001 - view() must never fail (safe() calls it)
+            log_event("export_failed", detail=type(error).__name__)
+            holder.notice = message(FailureKind.unexpected)
     message_text = holder.notice or service.result_message(s)
     return (
         service.preview(s) if s is not None else None,
@@ -144,7 +151,7 @@ def on_upload(holder: Holder, path: str | None) -> tuple:
         holder.notice = rejected.message
         return view(holder)
     service.close(holder.session)
-    holder.session = new
+    holder.session, holder.size_touched = new, False
     return view(holder)
 
 
@@ -163,13 +170,32 @@ def on_size(holder: Holder, width, height) -> tuple:
     s = holder.session
     if s is None:
         return view(holder)
-    if (width, height) == (s.map_size.width, s.map_size.height):
-        return view(holder)
+    _apply_size(holder, width, height)
+    return view(holder)
+
+
+def _apply_size(holder: Holder, width, height) -> bool:
+    """Apply the size fields if the user typed in them or they differ from the session's.
+
+    Returns False (with the range message as the notice) when the size is invalid.
+    """
+    s = holder.session
+    unchanged = (width, height) == (s.map_size.width, s.map_size.height)
+    if unchanged and not holder.size_touched:
+        return True
+    holder.size_touched = False
     try:
         service.set_map_size(s, width, height)
     except MapSizeInvalid as invalid:
         holder.notice = invalid.message
-    return view(holder)
+        return False
+    return True
+
+
+def on_size_typed(holder: Holder) -> None:
+    """The user typed in a size field: mark it, so the value counts as typed when applied."""
+    if holder is not None:
+        holder.size_touched = True
 
 
 @safe
@@ -205,13 +231,9 @@ def _pass(holder: Holder, width, height, detect: bool, kind: PassKind):
     # Apply the option and a size typed just before the click (their events may not have run
     # yet); a typed size turns detection off, as it wins over the detected one.
     service.set_detect(s, detect)
-    if (width, height) != (s.map_size.width, s.map_size.height):
-        try:
-            service.set_map_size(s, width, height)
-        except MapSizeInvalid as invalid:
-            holder.notice = invalid.message
-            yield view(holder)
-            return
+    if not _apply_size(holder, width, height):
+        yield view(holder)
+        return
     ticket = service.begin_pass(s, kind)
     if ticket is None:
         yield view(holder)
@@ -270,7 +292,7 @@ def build_ui(settings: Settings) -> gr.Blocks:
         with gr.Row():
             with gr.Column(scale=1):
                 upload = gr.File(
-                    label="Map image (PNG, JPEG or WebP, up to 20 MB)",
+                    label=f"Map image (PNG, JPEG or WebP, up to {app.max_upload_mb:g} MB)",
                     file_types=types,
                     type="filepath",
                 )
@@ -317,6 +339,8 @@ def build_ui(settings: Settings) -> gr.Blocks:
         ]
         upload.upload(on_upload, [holder, upload], outputs)
         upload.clear(on_clear, [holder], outputs)
+        for field in (width, height):
+            field.input(on_size_typed, [holder], None)
         for event in (width.blur, width.submit, height.blur, height.submit):
             event(on_size, [holder, width, height], outputs)
         detect.input(on_detect, [holder, detect], outputs)

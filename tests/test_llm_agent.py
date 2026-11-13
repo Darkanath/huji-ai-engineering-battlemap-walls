@@ -195,3 +195,12 @@ def test_cost_is_added_per_response_at_each_models_price():
     trace.add_usage(usage, {"input": 2.0, "output": 10.0})
     assert trace.cost_usd == pytest.approx((1000 * 4 + 100 * 20 + 1000 * 2 + 100 * 10) / 1e6)
     assert trace.input_tokens == 2000
+
+
+def test_detect_map_size_uses_the_configs_limits():
+    """A size inside 1..200 but above [app] max_squares is not used."""
+    client, trace = FakeClient([size_reply(grid_found=True, width=150, height=10)]), Trace()
+    cfg = load_config()
+    cfg["app"]["max_squares"] = 100
+    image = Image.new("RGB", (700, 800), (90, 90, 90))
+    assert detect_map_size(image, cfg, client, trace) is None

@@ -60,8 +60,9 @@ def classify(error: BaseException) -> FailureKind:
         return FailureKind.rate_limit
     if isinstance(error, anthropic.AuthenticationError | anthropic.PermissionDeniedError):
         return FailureKind.auth
-    if isinstance(error, anthropic.APIStatusError):
-        return FailureKind.provider_busy
+    if isinstance(error, anthropic.APIStatusError) and error.status_code >= 500:
+        return FailureKind.provider_busy  # 5xx, and 529 overloaded
+    # Other 4xx (bad request, unknown model, request too large): retrying will not help.
     if isinstance(error, ValidationError):
         return FailureKind.unreadable
     return FailureKind.unexpected
@@ -115,7 +116,9 @@ def run_pass(
         if client is None:
             if not os.environ.get("ANTHROPIC_API_KEY"):
                 raise _Stop(FailureKind.missing_key, "ANTHROPIC_API_KEY is not set")
-            client = anthropic.Anthropic()
+            # No SDK retries: each retry would get the whole time left again and could run the
+            # pass far past its deadline and bill it twice. A failed pass says "try again".
+            client = anthropic.Anthropic(max_retries=0)
         cfg = load_config(kind.value)
         deadline = start + profile.deadline_s
 
@@ -130,7 +133,14 @@ def run_pass(
             else:
                 traced, source = fallback_size, MapSizeSource.not_found
 
-        trace_map(image, traced.as_tuple(), cfg, client, deadline=deadline, trace=trace)
+        try:
+            trace_map(image, traced.as_tuple(), cfg, client, deadline=deadline, trace=trace)
+        except anthropic.APIError as error:
+            # A request that fails after a submission (often the deadline running out during
+            # the model's check of its own answer) keeps that submission: it was paid for.
+            if trace.answer is None:
+                raise
+            trace.stopped = f"kept last submission after {type(error).__name__}"
         if trace.answer is None:
             # Limits and deadlines with an answer keep it: the last submission stands.
             stop_kind = STOP_KINDS.get(trace.stopped, FailureKind.unreadable)

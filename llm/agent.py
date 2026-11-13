@@ -417,7 +417,7 @@ SIZE_TOOL = {
         }
     ),
 }
-SIZE_RANGE = (1, 200)  # squares per side the app accepts
+SIZE_RANGE = (1, 200)  # squares per side, unless the config's [app] table narrows it
 EDGE_SHARE = 0.12  # each edge strip is this share of the map's height (top) or width (left)
 
 
@@ -486,7 +486,9 @@ def detect_map_size(
             if not args.get("grid_found"):
                 return None
             size = args.get("width"), args.get("height")
-            low, high = SIZE_RANGE
+            app = cfg.get("app", {})
+            low = app.get("min_squares", SIZE_RANGE[0])
+            high = app.get("max_squares", SIZE_RANGE[1])
             if all(isinstance(v, int) and low <= v <= high for v in size):
                 return size
             return None

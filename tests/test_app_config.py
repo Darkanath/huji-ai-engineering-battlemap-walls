@@ -63,3 +63,17 @@ def test_unknown_size_step_profile_fails(raw):
     raw["size_step"]["profile"] = "fastest"
     with pytest.raises(ValidationError):
         Settings.model_validate(raw)
+
+
+def test_map_size_limits_outside_the_domain_fail(raw):
+    """[app] max_squares above 200 is refused, since MapSize allows only 1..200."""
+    raw["app"]["max_squares"] = 300
+    with pytest.raises(ValidationError, match="min_squares"):
+        Settings.model_validate(raw)
+
+
+def test_default_size_outside_the_limits_fails(raw):
+    """The default map size must be inside min_squares..max_squares."""
+    raw["app"]["default_width"] = 250
+    with pytest.raises(ValidationError, match="default"):
+        Settings.model_validate(raw)

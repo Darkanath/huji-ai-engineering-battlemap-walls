@@ -86,7 +86,6 @@ def test_deep_pass_uses_opus_fresh_and_at_its_price(image, settings):
 
 # --- Failure kinds (contracts/ui.md) ---------------------------------------------------------
 
-BAD_ARC = {"cx": 5, "cy": 5, "r": -1, "start_deg": 0, "end_deg": 90}
 REQUEST = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
 
 
@@ -103,6 +102,8 @@ def status_error(cls, code: int):
         ([status_error(anthropic.RateLimitError, 429)], FailureKind.rate_limit),
         ([status_error(anthropic.APIStatusError, 529)], FailureKind.provider_busy),
         ([status_error(anthropic.InternalServerError, 500)], FailureKind.provider_busy),
+        ([status_error(anthropic.BadRequestError, 400)], FailureKind.unexpected),
+        ([status_error(anthropic.NotFoundError, 404)], FailureKind.unexpected),
         ([status_error(anthropic.AuthenticationError, 401)], FailureKind.auth),
         ([status_error(anthropic.PermissionDeniedError, 403)], FailureKind.auth),
         ([anthropic.APIConnectionError(request=REQUEST)], FailureKind.network),
@@ -114,9 +115,9 @@ def status_error(cls, code: int):
             FailureKind.unreadable,
         ),
         (
-            # A submission that fails validation (an arc with a negative radius).
+            # A submission that fails validation (walls given as an object, not a list).
             [
-                reply(call("submit_answer", {**ANSWER, "arcs": [BAD_ARC]})),
+                reply(call("submit_answer", {**ANSWER, "walls": {}})),
                 reply(text("ok"), stop="end_turn"),
             ],
             FailureKind.unreadable,
@@ -216,3 +217,39 @@ def test_size_step_runs_on_opus_in_the_quick_pass_and_is_priced_as_opus(image, s
     expected += (2000 * sonnet.input + 200 * sonnet.output) / 1e6
     assert result.cost_usd == pytest.approx(expected)
     assert result.model_id == "claude-sonnet-5-5"  # the pass is still the quick one
+
+
+def test_error_after_a_submission_keeps_the_answer(image, settings):
+    """A request that fails after the model submitted (e.g. the deadline mid-check) keeps it."""
+    script = [
+        reply(call("submit_answer", ANSWER)),
+        anthropic.APITimeoutError(request=REQUEST),
+    ]
+    result = run_pass(image, TEN, FALLBACK, PassKind.quick, settings, FakeClient(script))
+    assert isinstance(result, TraceResult) and len(result.walls) == 1
+
+
+def test_arc_with_no_radius_is_dropped_not_fatal(image, settings):
+    """One degenerate arc is dropped; the rest of the answer is kept."""
+    arc = {"cx": 5, "cy": 5, "r": 0, "start_deg": 0, "end_deg": 90}
+    script = [
+        reply(call("submit_answer", {**ANSWER, "arcs": [arc]})),
+        reply(text("ok"), stop="end_turn"),
+    ]
+    result = run_pass(image, TEN, FALLBACK, PassKind.quick, settings, FakeClient(script))
+    assert isinstance(result, TraceResult) and len(result.walls) == 1
+
+
+def test_the_app_client_makes_no_retries(image, settings, monkeypatch):
+    """The real client is built with max_retries=0, so a pass cannot outrun its deadline."""
+    made = {}
+
+    def fake(**kwargs):
+        """Record the client's arguments and return a scripted client."""
+        made.update(kwargs)
+        return FakeClient(ok_script())
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy")
+    monkeypatch.setattr(anthropic, "Anthropic", fake)
+    assert isinstance(run_pass(image, TEN, FALLBACK, PassKind.quick, settings), TraceResult)
+    assert made == {"max_retries": 0}

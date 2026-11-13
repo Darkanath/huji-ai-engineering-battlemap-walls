@@ -54,6 +54,10 @@ class Session:
     running: PassKind | None = None
     started_at: float | None = None
     extension: str = ".dd2vtt"
+    result_version: int = 0  # goes up with each new mask
+    # The last export file and what it was built from, so it is rebuilt only on a change.
+    export_key: tuple | None = None
+    export_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -170,14 +174,17 @@ def begin_pass(session: Session, kind: PassKind) -> PassTicket | None:
     )
 
 
-def finish_pass(session: Session, ticket: PassTicket, outcome: TraceResult | PassFailure) -> bool:
-    """Apply a pass's outcome; False (and nothing changes) if a new upload replaced the session.
+def finish_pass(
+    session: Session | None, ticket: PassTicket, outcome: TraceResult | PassFailure
+) -> bool:
+    """Apply a pass's outcome; False (and nothing changes) if the session was replaced by a
+    new upload or cleared (`session` is None) while the pass ran. The drop is logged with cost.
 
-    A failure is recorded and the earlier mask kept. A success replaces the mask; a detected
-    size is applied unless the user typed one while the pass ran; no grid found keeps the size
-    and sets the note.
+    A failure is recorded and the earlier mask kept. A success replaces the mask. Only when the
+    pass looked for the size (the ticket had none): a detected size is applied unless the user
+    typed one while the pass ran, and no grid found keeps the size and sets the note.
     """
-    if ticket.token != session.token:
+    if session is None or ticket.token != session.token:
         log_event("pass_dropped", profile=ticket.kind.value, cost_usd=outcome.cost_usd)
         return False
     session.running = session.started_at = None
@@ -185,13 +192,15 @@ def finish_pass(session: Session, ticket: PassTicket, outcome: TraceResult | Pas
         session.last_failure = outcome
         return True
     session.result, session.last_failure = outcome, None
-    typed_meanwhile = session.size_version != ticket.size_version
-    if outcome.size_source == MapSizeSource.detected and not typed_meanwhile:
+    session.result_version += 1
+    if ticket.map_size is not None or session.size_version != ticket.size_version:
+        return True  # no detection ran, or the user's typed size wins
+    if outcome.size_source == MapSizeSource.detected:
         session.map_size = outcome.traced_size
         session.size_source = MapSizeSource.detected
         session.detect_size = False
         session.size_note = DETECTED
-    elif outcome.size_source == MapSizeSource.not_found and not typed_meanwhile:
+    elif outcome.size_source == MapSizeSource.not_found:
         session.size_source = MapSizeSource.not_found
         session.size_note = NO_GRID
     return True
@@ -216,13 +225,19 @@ def set_extension(session: Session, extension: str) -> None:
 def export(session: Session) -> Path:
     """Write the mask on screen to the session's temp folder; returns the file's path.
 
-    Uses the map size on screen. Raises ValueError when there is no mask (the page only
-    offers the download when there is one).
+    Uses the map size on screen. The file is rebuilt only when the mask, the map size or the
+    extension changed since the last export. Raises ValueError when there is no mask (the
+    page only offers the download when there is one).
     """
     if session.result is None:
         raise ValueError("there is no mask to export")
+    key = (session.result_version, session.map_size, session.extension)
+    if key == session.export_key and session.export_path and session.export_path.exists():
+        return session.export_path
     payload = exporter.build(session.result, session.map_size, session.image, session.settings)
-    return exporter.write(session.tmp_dir / f"{session.image_name}{session.extension}", payload)
+    path = exporter.write(session.tmp_dir / f"{session.image_name}{session.extension}", payload)
+    session.export_key, session.export_path = key, path
+    return path
 
 
 def status_line(session: Session | None) -> str:

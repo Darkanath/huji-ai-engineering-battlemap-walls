@@ -111,9 +111,22 @@ def manifest_jobs(manifest: Path, maps: list[str]) -> list[Job]:
     return jobs
 
 
-def confirm(n_maps: int, per_map: float, assume_yes: bool) -> bool:
+def estimate_per_map(cfg: dict, profile: str) -> float:
+    """The profile's measured cost per map, scaled by token price when --model replaced its
+    model (the token count is assumed the same; an --effort change is not accounted for)."""
+    base = cfg["profiles"][profile]
+    per_map = base["expected_cost_usd"]
+    if cfg["model"]["name"] != base["name"]:
+        old, new = cfg["prices"][base["name"]], cfg["prices"][cfg["model"]["name"]]
+        per_map *= new["output"] / old["output"]
+    return per_map
+
+
+def confirm(n_maps: int, per_map: float, assume_yes: bool, note: str = "") -> bool:
     """Print the estimated cost and ask before any paid call (unless `assume_yes`)."""
     print(f"{n_maps} maps, estimated cost about ${n_maps * per_map:.2f} (${per_map:.2f} per map).")
+    if note:
+        print(note)
     if assume_yes:
         return True
     return input("Continue? [y/N] ").strip().lower() in ("y", "yes")
@@ -166,7 +179,13 @@ def main(argv: list[str] | None = None) -> None:
             print(f"{job.name}: already traced, skipping (use --redo)")
     if not todo:
         return
-    if not confirm(len(todo), cfg["model"]["expected_cost_usd"], args.yes):
+    note = ""
+    if args.model or args.effort:
+        note = (
+            f"The estimate is the {args.profile} profile's measured cost, scaled to "
+            f"{cfg['model']['name']}'s token price; effort changes are not included."
+        )
+    if not confirm(len(todo), estimate_per_map(cfg, args.profile), args.yes, note):
         print("Stopped; nothing was sent.")
         return
 

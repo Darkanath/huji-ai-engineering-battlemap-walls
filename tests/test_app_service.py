@@ -377,3 +377,35 @@ def test_non_square_cells_warn_but_apply(session):
     assert service.set_map_size(session, 25, 25) is None
     assert service.set_map_size(session, 20, 30) == NOT_SQUARE
     assert session.map_size == MapSize(width=20, height=30)
+
+
+def test_result_for_a_cleared_session_is_dropped(session):
+    """A pass that ends after the upload was cleared is dropped without an error."""
+    ticket = service.begin_pass(session, QUICK)
+    assert service.finish_pass(None, ticket, make_result()) is False
+
+
+def test_no_grid_note_only_after_a_pass_that_looked(session):
+    """A pass with a given size never sets the no-grid note, even after an earlier one did."""
+    run(session, make_result(source=MapSizeSource.not_found))
+    session.size_note = ""
+    service.set_detect(session, False)
+    stale = make_result(source=MapSizeSource.not_found)  # the source the ticket carried
+    ticket = service.begin_pass(session, QUICK)
+    assert ticket.map_size is not None
+    service.finish_pass(session, ticket, stale)
+    assert session.size_note == ""
+
+
+def test_export_is_rebuilt_only_on_a_change(session, monkeypatch):
+    """Exporting twice with nothing changed builds the file once; a size change rebuilds it."""
+    run(session, make_result())
+    calls = []
+    real = service.exporter.build
+    monkeypatch.setattr(service.exporter, "build", lambda *a: calls.append(1) or real(*a))
+    service.export(session)
+    service.export(session)
+    assert len(calls) == 1
+    service.set_map_size(session, 30, 30)
+    service.export(session)
+    assert len(calls) == 2

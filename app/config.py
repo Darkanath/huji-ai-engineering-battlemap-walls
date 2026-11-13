@@ -10,6 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.domain import MAX_SQUARES, MIN_SQUARES
 from llm.agent import CONFIG
 
 TIERS = ("small", "medium", "large")
@@ -91,7 +92,8 @@ class Settings(BaseModel):
 
     @model_validator(mode="after")
     def _check(self) -> "Settings":
-        """Both profiles exist, each profile's model has a price, all three tiers are set."""
+        """Both profiles exist, each profile's model has a price, all three tiers are set, and
+        the map-size limits fit the domain's 1..200 (MapSize enforces that range itself)."""
         for kind in ("quick", "deep"):
             if kind not in self.profiles:
                 raise ValueError(f"profile {kind!r} is missing")
@@ -101,6 +103,14 @@ class Settings(BaseModel):
         missing = [t for t in TIERS if t not in self.lights]
         if missing:
             raise ValueError(f"light tiers missing: {', '.join(missing)}")
+        app = self.app
+        if not MIN_SQUARES <= app.min_squares <= app.max_squares <= MAX_SQUARES:
+            raise ValueError(
+                f"[app] min_squares..max_squares must lie within {MIN_SQUARES}..{MAX_SQUARES}"
+            )
+        for side in (app.default_width, app.default_height):
+            if not app.min_squares <= side <= app.max_squares:
+                raise ValueError("[app] default map size is outside min_squares..max_squares")
         return self
 
     def light_table(self) -> dict[str, dict]:
