@@ -20,6 +20,9 @@ from data.rasterize import DEFAULT_PPG, LIGHT_TIERS
 
 ARC_STEP_DEG = 5.0  # an arc becomes a polyline with a point about every 5 degrees
 LIGHT_COLOR = "ffeccd8b"  # warm white, the color Dungeondraft exports for a torch
+# What the file says for each light tier, unless the caller passes its own table (the app
+# passes the one in llm/configs/claude.toml, which a test keeps equal to this).
+DEFAULT_LIGHTS = {tier: {"range": v["range"], "intensity": 1} for tier, v in LIGHT_TIERS.items()}
 
 
 def arc_points(cx: float, cy: float, r: float, start_deg: float, end_deg: float) -> list[dict]:
@@ -43,12 +46,13 @@ def _portal(p: dict) -> dict:
     }
 
 
-def _light(light: dict) -> dict:
-    """One light entry; `range` comes from the tier table, never from the image."""
+def _light(light: dict, lights: dict = DEFAULT_LIGHTS) -> dict:
+    """One light entry; `range` and `intensity` come from the tier table, never the image."""
+    spec = lights[light["tier"]]
     return {
         "position": {"x": light["x"], "y": light["y"]},
-        "range": LIGHT_TIERS[light["tier"]]["range"],
-        "intensity": 1,
+        "range": spec["range"],
+        "intensity": spec["intensity"],
         "color": LIGHT_COLOR,
         "shadows": True,
     }
@@ -59,11 +63,13 @@ def answer_to_uvtt(
     map_size: tuple[int, int],
     ppg: int = DEFAULT_PPG,
     image_bytes: bytes | None = None,
+    lights: dict = DEFAULT_LIGHTS,
 ) -> dict:
     """Build the .dd2vtt dict for a map of `map_size` squares.
 
     `image_bytes` is the encoded map image to embed (PNG or JPEG); without it the file has no
-    image, which is enough for rasterizing and scoring.
+    image, which is enough for rasterizing and scoring. `lights` maps each tier to its
+    `{"range", "intensity"}`.
     """
     lines = [
         [{"x": p["x"], "y": p["y"]} for p in w["points"]]
@@ -84,7 +90,7 @@ def answer_to_uvtt(
         "line_of_sight": lines,
         "objects_line_of_sight": [],
         "portals": [_portal(p) for p in answer.get("portals", [])],
-        "lights": [_light(light) for light in answer.get("lights", [])],
+        "lights": [_light(light, lights) for light in answer.get("lights", [])],
         "environment": {"baked_lighting": True, "ambient_light": "ffffffff"},
         "image": base64.b64encode(image_bytes).decode("ascii") if image_bytes else "",
     }

@@ -1,12 +1,36 @@
-# Settings for the Claude wall tracer (llm/agent.py). Change the model here to compare models.
+# Settings for the Claude wall tracer (llm/agent.py) and the app (app/). Model names, effort,
+# limits and prices live here, never in code. Validated by app/config.py.
 
-[model]
-name = "claude-opus-5-5"   # also tried: claude-sonnet-5-5, claude-haiku-5-5, claude-fable-5-2
-effort = "medium"          # low | medium | high | xhigh | max: thinking depth and token spend
-max_tokens = 16000         # per response; one answer for a cave map is about 4,000 tokens
-# If a safety classifier declines a request, let the API re-run it on a fallback model
-# (not offered for Haiku). The run log records which model answered.
+# Two profiles, one per pass. `expected_*` are shown on the app's buttons: update them after
+# each full reference evaluation (docs/results.md). `deadline_s` stops a pass that runs long.
+# If a safety classifier declines a request, `fallbacks` lets the API re-run it on a fallback
+# model (not offered for Haiku); the run log records which model answered.
+# Other models for comparisons: claude-haiku-5-5, claude-fable-5-2 (llm.run --model).
+
+[profiles.quick]             # "Suggest walls"
+name = "claude-sonnet-5-5"
+label = "Sonnet 5.5"
+effort = "medium"            # low | medium | high | xhigh | max: thinking depth and token spend
+max_tokens = 16000           # per response; one answer for a cave map is about 4,000 tokens
 fallbacks = true
+deadline_s = 60
+expected_seconds = 25        # measured 13.11 with the Opus size step (docs/results.md)
+expected_cost_usd = 0.10
+
+[profiles.deep]              # "Deeper examination"
+name = "claude-opus-5-5"
+label = "Opus 5.5"
+effort = "medium"
+max_tokens = 16000
+fallbacks = true
+deadline_s = 180
+expected_seconds = 70        # measured 13.11 with the size step (docs/results.md)
+expected_cost_usd = 0.32
+
+# The map-size step runs on this profile's model in both passes: on 13.11 Opus found the size
+# on 3 of 3 grid maps and Sonnet on 1 of 3 (docs/results.md). Its cost is part of each pass.
+[size_step]
+profile = "deep"
 
 [limits]
 max_turns = 24             # API calls per map
@@ -34,3 +58,25 @@ output = 10.0
 [prices."claude-haiku-5-5"]
 input = 0.10
 output = 0.50
+
+# Light size tiers -> what the exported file says. Must equal LIGHT_TIERS in data/rasterize.py
+# (tested). Roll20 derives bright and dim light from `range` on import.
+[lights.small]               # candle, torch, wall sconce
+range = 8.0
+intensity = 1.0
+[lights.medium]              # lantern, brazier, campfire, fireplace
+range = 12.0
+intensity = 1.0
+[lights.large]               # bonfire, large fire pit, forge
+range = 16.0
+intensity = 1.0
+
+# The app's input limits and export settings.
+[app]
+max_upload_mb = 20
+min_squares = 1
+max_squares = 200
+default_width = 25
+default_height = 25
+export_ppg = 70              # Roll20's default pixels per square
+export_jpeg_quality = 90

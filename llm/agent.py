@@ -8,6 +8,7 @@ A spike on 13.11 (docs/results.md) showed why the loop is needed: one look at th
 enough to understand the layout, but not to place doors and wall ends within 0.1 square.
 """
 
+import time
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -153,9 +154,23 @@ def quadrant_boxes(map_size: tuple[int, int], overlap: float = 1.0) -> list[tupl
     return [(x0, y0, x1, y1) for y0, y1 in ys for x0, x1 in xs]
 
 
-def load_config(path: Path = CONFIG) -> dict:
-    """Read the tracer settings (model, limits, view sizes, prices)."""
-    return tomllib.loads(path.read_text())
+def size_step_config(path: Path = CONFIG) -> dict:
+    """The config for the map-size step: the profile named in `[size_step]`, in either pass."""
+    profile = tomllib.loads(path.read_text())["size_step"]["profile"]
+    return load_config(profile, path)
+
+
+def load_config(profile: str = "quick", path: Path = CONFIG) -> dict:
+    """Read the tracer settings (limits, view sizes, prices) for one model profile.
+
+    `profile` names a `[profiles.*]` table ("quick" or "deep"); a copy of it becomes
+    `cfg["model"]`, which is what the tool loop reads, so changing it never touches the profile.
+    """
+    cfg = tomllib.loads(path.read_text())
+    if profile not in cfg["profiles"]:
+        raise ValueError(f"unknown profile {profile!r}; expected one of {sorted(cfg['profiles'])}")
+    cfg["model"] = dict(cfg["profiles"][profile])
+    return cfg
 
 
 @dataclass
@@ -175,36 +190,70 @@ class Trace:
     stopped: str = ""  # why the loop ended
     note: str = ""  # the model's closing remark
     log: list[dict] = field(default_factory=list)  # one entry per tool call, for the run folder
+    # Each raw response's text and tool calls (no thinking, no images), for the run folder and
+    # for recording test fixtures.
+    responses: list[dict] = field(default_factory=list)
 
     def add_usage(self, usage, prices: dict) -> None:
-        """Add one response's token counts and update the cost estimate."""
-        self.input_tokens += usage.input_tokens or 0
-        self.output_tokens += usage.output_tokens or 0
-        self.cache_write_tokens += getattr(usage, "cache_creation_input_tokens", 0) or 0
-        self.cache_read_tokens += getattr(usage, "cache_read_input_tokens", 0) or 0
-        weighted_in = (
-            self.input_tokens
-            + CACHE_WRITE * self.cache_write_tokens
-            + CACHE_READ * self.cache_read_tokens
+        """Add one response's token counts and its cost at `prices` to the running totals.
+
+        Cost is added per response, so a pass that uses two models (the map-size step on one,
+        the trace on another) is priced correctly.
+        """
+        inp = usage.input_tokens or 0
+        out = usage.output_tokens or 0
+        cache_write = getattr(usage, "cache_creation_input_tokens", 0) or 0
+        cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+        self.input_tokens += inp
+        self.output_tokens += out
+        self.cache_write_tokens += cache_write
+        self.cache_read_tokens += cache_read
+        weighted_in = inp + CACHE_WRITE * cache_write + CACHE_READ * cache_read
+        self.cost_usd += (weighted_in * prices["input"] + out * prices["output"]) / 1e6
+
+    def record(self, response) -> None:
+        """Keep a response's text and tool-call blocks, in the fixture format of tests/."""
+        blocks = []
+        for b in response.content:
+            if b.type == "text":
+                blocks.append({"type": "text", "text": b.text})
+            elif b.type == "tool_use":
+                blocks.append({"type": "tool_use", "name": b.name, "input": b.input, "id": b.id})
+        self.responses.append(
+            {"stop_reason": response.stop_reason, "model": response.model, "content": blocks}
         )
-        self.cost_usd = (
-            weighted_in * prices["input"] + self.output_tokens * prices["output"]
-        ) / 1e6
 
 
-def _request(client: anthropic.Anthropic, cfg: dict, messages: list[dict]):
-    """One Messages API call with the tracer's fixed settings."""
+def _time_left(deadline: float | None) -> float | None:
+    """Seconds until `deadline` (a time.monotonic() value), or None when there is none."""
+    return None if deadline is None else deadline - time.monotonic()
+
+
+def _request(
+    client: anthropic.Anthropic,
+    cfg: dict,
+    messages: list[dict],
+    timeout: float | None = None,
+    system: str = SYSTEM,
+    tools: list[dict] = TOOLS,
+):
+    """One Messages API call with the tracer's fixed settings.
+
+    `timeout` (seconds) bounds this request; `system` and `tools` default to the tracing ones.
+    """
     model = cfg["model"]
     params = {
         "model": model["name"],
         "max_tokens": model["max_tokens"],
-        "system": SYSTEM,
-        "tools": TOOLS,
+        "system": system,
+        "tools": tools,
         "messages": messages,
         "thinking": {"type": "adaptive"},
         "output_config": {"effort": model["effort"]},
         "cache_control": {"type": "ephemeral"},  # each turn re-reads the earlier turns cheaply
     }
+    if timeout is not None:
+        params["timeout"] = timeout
     if model.get("fallbacks") and not model["name"].startswith("claude-haiku"):
         return client.beta.messages.create(betas=[FALLBACK_BETA], fallbacks="default", **params)
     return client.messages.create(**params)
@@ -216,18 +265,24 @@ def trace_map(
     cfg: dict | None = None,
     client: anthropic.Anthropic | None = None,
     views_dir: Path | None = None,
+    deadline: float | None = None,
+    trace: Trace | None = None,
 ) -> Trace:
     """Run the tool loop on one map image and return the answer with its usage.
 
     `map_size` is the map's width and height in grid squares. With `views_dir`, every image
     sent to the model is also saved there, for inspection and for the presentation.
+    `deadline` is a time.monotonic() value: no request starts after it (the loop stops with
+    `stopped = "timeout"`), and each request may take only the time left. Pass a `trace` to
+    add to one that already holds usage (the map-size step); if a request raises, that trace
+    still holds everything spent before it.
     """
     cfg = cfg or load_config()
     client = client or anthropic.Anthropic()
     limits, view_cfg = cfg["limits"], cfg["views"]
     prices = cfg["prices"][cfg["model"]["name"]]
     ppg = image.width / map_size[0]
-    trace = Trace()
+    trace = trace if trace is not None else Trace()
     uvtt: dict | None = None  # the latest submission, for overlays
     shots = 0
 
@@ -298,10 +353,15 @@ def trace_map(
         if trace.cost_usd >= limits["max_cost_usd"]:
             trace.stopped = "cost limit"
             break
-        response = _request(client, cfg, messages)
+        left = _time_left(deadline)
+        if left is not None and left <= 0:
+            trace.stopped = "timeout"
+            break
+        response = _request(client, cfg, messages, timeout=left)
         trace.turns += 1
         trace.add_usage(response.usage, prices)
         trace.served_by.add(response.model)
+        trace.record(response)
         messages.append({"role": "assistant", "content": response.content})
 
         if response.stop_reason in ("refusal", "max_tokens"):
@@ -335,3 +395,99 @@ def trace_map(
             )
         messages.append({"role": "user", "content": results})
     return trace
+
+
+SIZE_SYSTEM = """\
+You measure battlemaps for virtual tabletops. Given a top-down map image, count its grid \
+squares: how many whole squares across (width) and down (height). Only square grids count. \
+You get the whole map, then its top and left edges at higher zoom, where the grid lines are \
+easiest to count. Answer with report_map_size. Set grid_found to false when the map has no \
+visible square grid, or when its squares cannot be counted with confidence; then give 0 for \
+width and height."""
+
+SIZE_TOOL = {
+    "name": "report_map_size",
+    "description": "Report the map's size in grid squares, or that no grid was found.",
+    "strict": True,
+    "input_schema": _obj(
+        {
+            "grid_found": {"type": "boolean"},
+            "width": {"type": "integer"},
+            "height": {"type": "integer"},
+        }
+    ),
+}
+SIZE_RANGE = (1, 200)  # squares per side the app accepts
+EDGE_SHARE = 0.12  # each edge strip is this share of the map's height (top) or width (left)
+
+
+def _fit(image: Image.Image, max_px: int) -> Image.Image:
+    """The image scaled down so its longer side is at most `max_px` (never up)."""
+    scale = min(1.0, max_px / max(image.size))
+    if scale == 1.0:
+        return image
+    return image.resize((round(image.width * scale), round(image.height * scale)), Image.LANCZOS)
+
+
+def size_views(image: Image.Image, max_px: int) -> list[tuple[str, Image.Image]]:
+    """The map-size step's images: the whole map, then each half of the top and left edges.
+
+    Halving each edge strip doubles its zoom compared with the whole map. No grid overlay is
+    drawn: the model counts the map's own grid.
+    """
+    w, h = image.size
+    top, left = max(1, round(h * EDGE_SHARE)), max(1, round(w * EDGE_SHARE))
+    crops = [
+        ("Top edge, left half:", (0, 0, w // 2, top)),
+        ("Top edge, right half:", (w // 2, 0, w, top)),
+        ("Left edge, upper half:", (0, 0, left, h // 2)),
+        ("Left edge, lower half:", (0, h // 2, left, h)),
+    ]
+    out = [("The whole map:", _fit(image, max_px))]
+    out += [(label, _fit(image.crop(box), max_px)) for label, box in crops]
+    return out
+
+
+def detect_map_size(
+    image: Image.Image,
+    cfg: dict,
+    client: anthropic.Anthropic,
+    trace: Trace,
+    deadline: float | None = None,
+) -> tuple[int, int] | None:
+    """Ask the model, in one request, how many grid squares the map has across and down.
+
+    Uses the model in `cfg["model"]` (the app passes the `[size_step]` profile, Opus, in both
+    passes); the response's usage and cost are added to `trace`, so the pass reports one total.
+    Returns (width, height), or None when no grid was found, the model gave no size, or the
+    size is outside 1..200. A refusal sets `trace.stopped = "refusal"`; a
+    deadline already passed sets it to "timeout". API errors are raised to the caller.
+    """
+    left = _time_left(deadline)
+    if left is not None and left <= 0:
+        trace.stopped = "timeout"
+        return None
+    view_cfg = cfg["views"]
+    content: list[dict] = []
+    for label, view in size_views(image, view_cfg["max_px"]):
+        content += [{"type": "text", "text": label}, to_image_block(view, view_cfg["jpeg_quality"])]
+    content.append({"type": "text", "text": "How many grid squares is this map across and down?"})
+    messages = [{"role": "user", "content": content}]
+    response = _request(client, cfg, messages, timeout=left, system=SIZE_SYSTEM, tools=[SIZE_TOOL])
+    trace.add_usage(response.usage, cfg["prices"][cfg["model"]["name"]])
+    trace.served_by.add(response.model)
+    trace.record(response)
+    if response.stop_reason == "refusal":
+        trace.stopped = "refusal"
+        return None
+    for block in response.content:
+        if block.type == "tool_use" and block.name == "report_map_size":
+            args = block.input
+            if not args.get("grid_found"):
+                return None
+            size = args.get("width"), args.get("height")
+            low, high = SIZE_RANGE
+            if all(isinstance(v, int) and low <= v <= high for v in size):
+                return size
+            return None
+    return None
