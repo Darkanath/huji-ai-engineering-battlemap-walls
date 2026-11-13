@@ -6,14 +6,13 @@ services:
     image: battlemap-walls:latest
     working_dir: /app
     volumes:
-      # Datasets, checkpoints and run logs live on the host so they persist and can be showcased.
+      # Maps and run outputs live on the host so they persist and can be showcased.
       # Note: data/ also holds data-tool code, so the host copy of that code is what runs.
       - ./data:/app/data
       - ./runs:/app/runs
       # Code and tests from the host, so editing them needs no rebuild (only new dependencies do).
       - ./tests:/app/tests
       - ./eval:/app/eval
-      - ./train:/app/train
       - ./postprocess:/app/postprocess
       - ./app:/app/app
       - ./llm:/app/llm
@@ -21,15 +20,6 @@ services:
     env_file:
       - path: .env
         required: false
-    environment:
-      # Physical cores on the i7-1365U (6 cores, 12 threads).
-      OMP_NUM_THREADS: "6"
-      MKL_NUM_THREADS: "6"
-      # Pretrained encoder weights download once into runs/cache, so later runs work offline.
-      TORCH_HOME: /app/runs/cache/torch
-      HF_HOME: /app/runs/cache/huggingface
-      # The image has no git (training logs the commit on Colab); keep MLflow from warning.
-      GIT_PYTHON_REFRESH: quiet
     ports:
       # Gradio's port for the app: docker compose run --rm --service-ports app python -m app.main
       - "7860:7860"

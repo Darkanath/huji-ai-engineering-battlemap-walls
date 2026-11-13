@@ -1,1 +1,1 @@
-"""Data tools: .dd2vtt -> mask rasterizer, synthetic map generator, dataset manifests."""
+"""Data tools: the .dd2vtt -> mask rasterizer, dataset manifests, light re-tiering."""

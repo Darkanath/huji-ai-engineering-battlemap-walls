@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Battlemap tracer: one CPU-only image for tests, data tools, the tracer and the Gradio app.
+# Battlemap tracer: one image for tests, data tools, the tracer and the Gradio app.
 # Build and test with: docker compose build && docker compose run --rm app pytest
 FROM ubuntu:24.04
 
@@ -26,7 +26,6 @@ RUN apt-get update \
 WORKDIR /app
 
 # Dependencies alone first, from the lockfile, so code changes don't reinstall them.
-# PyTorch comes from its CPU wheel index (pyproject.toml), so the image stays CPU-only.
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project

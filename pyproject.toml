@@ -11,14 +11,9 @@ license = { text = "MIT" }
 # Added one step at a time as each part of the pipeline needs them.
 # Installed with uv from uv.lock (`uv sync --frozen` in the Dockerfile).
 dependencies = [
-    "torch",  # week 3: U-Net (first approach); CPU-only wheels, see [tool.uv.sources]
-    "torchvision",  # week 3: pretrained encoder weights; CPU-only wheels
     "numpy",
     "Pillow",
-    "opencv-python-headless",  # week 2: Canny baseline, contours, distance transform for metrics
-    "segmentation-models-pytorch",  # week 3: U-Net with a pretrained ResNet-18 encoder
-    "albumentations",  # week 3: training augmentation (image and mask together)
-    "mlflow",  # week 3: run tracking (params, metrics per epoch, artifacts)
+    "opencv-python-headless",  # week 2: distance transform for the boundary F1 metric
     "anthropic",  # week 4: Claude API for the wall tracer (llm/), approved 13.11
     "gradio",  # 2026-11-13: the app's UI (app/main.py), agreed in the project plan
     "pydantic>=2",  # 2026-11-13: domain models and config validation (app/), asked for by the owner
@@ -31,22 +26,11 @@ dev = ["pytest", "ruff"]
 # The project runs only in the Linux container, so the lockfile resolves for Linux alone.
 environments = ["sys_platform == 'linux'"]
 
-# PyTorch comes from its CPU wheel index so the image never pulls CUDA. `explicit` keeps every
-# other package on PyPI.
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[tool.uv.sources]
-torch = [{ index = "pytorch-cpu" }]
-torchvision = [{ index = "pytorch-cpu" }]
-
 [project.scripts]
 rasterize = "data.rasterize:main"
 
 [tool.setuptools.packages.find]
-include = ["data", "train", "eval", "postprocess", "app", "llm"]
+include = ["data", "eval", "postprocess", "app", "llm"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,1 +1,1 @@
-"""Evaluation: pixel IoU, boundary F1, visibility IoU, the Canny baseline and reports."""
+"""Evaluation metrics: pixel IoU and F1, wall boundary F1, portal recall."""

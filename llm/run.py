@@ -27,13 +27,16 @@ from PIL import Image
 
 from data.manifest import read_manifest
 from data.rasterize import JPEG_QUALITY, decode_image, load_uvtt, overlay, rasterize_mask
-from eval.evaluate import DEFAULT_MANIFEST, PPG, ROOT, RUNS
 from eval.metrics import portal_recall, score
 from llm.agent import Trace, detect_map_size, load_config, size_step_config, trace_map
 from postprocess.uvtt import answer_to_uvtt, write_uvtt
 
 SCORE_KEYS = ("iou_wall", "boundary_f1_wall", "iou_portal", "iou_light")
+ROOT = Path(__file__).parents[1]
+RUNS = ROOT / "runs"
+DEFAULT_MANIFEST = ROOT / "data" / "processed" / "manifest.csv"  # built by data.manifest
 REFERENCE = ROOT / "data" / "reference"
+PPG = 32  # the scale every answer is scored at (CLAUDE.md, Evaluation)
 
 
 def save_map(
