@@ -1,7 +1,8 @@
 # Results
 
-Scores of every trained model, filled in as runs finish. Validation results pick the model;
-the test set runs once, in week 8 (training.md §6). How each run is trained: [training.md](training.md).
+Scores of every predictor, filled in as runs finish: the Canny baseline, the stage-1 U-Net
+(first approach; how it was trained: [training.md](training.md)) and the Claude tracer. The test
+set runs once, in week 8.
 Metrics: [eval/metrics.py](../eval/metrics.py), at 32 px per square; boundary F1 tolerance 0.1
 square (3 px).
 
@@ -149,3 +150,71 @@ model asking for it. Medium effort, one run per cell. Runs: `runs/claude_v2_*/`.
 - **Caves remain the weak spot** (0.88-0.92 boundary F1 against 0.99 on the castle): no model
   asked for a closer view of the mine.
 - Whole comparison: about $1.54. Both comparisons together: about $3.
+
+## Reference evaluation · both app profiles with the map-size step (13.11)
+
+The first scored run of the app's two profiles as configured (`[profiles.quick]` Sonnet 5.5,
+`[profiles.deep]` Opus 5.5, both medium effort, v2 harness), on the four committed reference
+maps in `data/reference/`, with the new map-size step (`--detect-size`) before each trace. One
+run per cell. Traced and scored on the true map size (25 x 25), so scores compare with v2;
+the detected size is recorded separately. Portal recall: share of labeled portals with a
+predicted midpoint within 0.5 square, matched one to one (`eval.metrics.portal_recall`).
+
+Commands: `python -m llm.run --reference --profile quick --detect-size` and the same with
+`--profile deep`. Runs: `runs/20261113-134942_quick/`, `runs/20261113-135137_deep/`.
+
+| Map | Profile | Wall IoU | Wall boundary F1 | Portal IoU | Portal recall | Light IoU | Size found | Extra views | Cost | Time |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `dd04_a` tavern | quick | 0.671 | 0.841 | 0 | 0 / 23 | 0.334 | 25 x 25, right | 0 | $0.07 | 14 s |
+| | deep | 0.622 | 0.963 | 0.640 | 1.00 | 0.342 | 25 x 25, right | 6 | $0.31 | 64 s |
+| `dd06_a` mine | quick | 0.208 | 0.545 | 0.189 | 0.25 | 0.079 | 18 x 18, wrong | 0 | $0.08 | 23 s |
+| | deep | 0.464 | 0.893 | 0.660 | 0.75 | 0.440 | 25 x 25, right | 0 | $0.41 | 104 s |
+| `dd07_a` castle | quick | 0.712 | 0.909 | 0 | 0 / 17 | 0.534 | 20 x 20, wrong | 0 | $0.10 | 29 s |
+| | deep | 0.758 | 0.992 | 0.785 | 0.94 | 0.659 | 25 x 25, right | 1 | $0.30 | 62 s |
+| `dd04_d` tavern, no grid | quick | 0.747 | 0.916 | 0.169 | 0.09 | 0.227 | none (correct) | 0 | $0.09 | 21 s |
+| | deep | 0.916 | 0.999 | 0.805 | 1.00 | 0.232 | none (correct) | 4 | $0.28 | 48 s |
+
+Means per map, including the map-size step: quick $0.085 and 22 s; deep $0.32 and 70 s
+(config before this run: $0.07 / 20 s and $0.27 / 60 s).
+
+Against the spec's thresholds (quickstart.md section 4):
+
+- **Deep pass: all met.** Castle wall boundary F1 0.992 (floor 0.95) and portal recall 0.94
+  (floor 0.5); mine 0.893 (floor 0.85).
+- **Quick pass, castle: 0.909, under the 0.95 floor.** The v2 run scored 0.960 on the same
+  map. Re-scoring the v2 answer with this run's scoring path gives 0.960 again, so scoring did
+  not change; the tracing code was not changed either. One run per cell cannot tell variance
+  from regression; the quickstart rule is to repeat a run under a floor before calling it one.
+- **Quick pass finds almost no doors on buildings** (0 of 23 on the tavern, 0 of 17 on the
+  castle), as in v2, and never asks for a closer view. The deep pass finds nearly all of them.
+- **Map size: deep 3 of 3 right, quick 1 of 3** (the mine read as 18 x 18 and the castle as
+  20 x 20). Both reported "no grid" on the grid-less tavern. The quick pass is under SC-009's
+  80% target. In the app, a wrong detected size means the mask is traced on the wrong grid,
+  then shown on that size until the user corrects it.
+- **Time:** the slowest deep pass (mine, 104 s) is inside the 180 s deadline; quick passes
+  (14-29 s) are inside 60 s.
+- Whole evaluation: $1.63 (estimated $1.40).
+
+### Castle repeat, and the map-size step moved to Opus (13.11)
+
+The quick pass scored 0.909 on the castle above, under its 0.95 floor. Following the
+quickstart rule, the map was traced again before calling it a regression; this run also uses
+the decision taken after the table above: **the map-size step runs on Opus in both passes**
+(`[size_step] profile = "deep"` in the config), because Sonnet found the size on 1 of 3 grid
+maps and Opus on 3 of 3.
+
+Command: `python -m llm.run --maps dd07_a --profile quick --detect-size --run
+20261113-quick-castle-repeat`. One run.
+
+| Map | Profile | Wall IoU | Wall boundary F1 | Portal IoU | Portal recall | Light IoU | Size found (Opus) | Size step cost | Total cost | Time |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `dd07_a` castle | quick | 0.685 | **0.966** | 0 | 0 / 17 | 0.475 | 25 x 25, right | $0.026 | $0.08 | 17 s |
+
+- **Not a regression:** 0.966 is above the floor and next to v2's 0.960. Three quick runs on the
+  castle now span 0.909 to 0.966; one run per cell is not enough to rank close results.
+- **The quick pass still finds no castle doors** in any of its three runs.
+- **Map size with Opus: 4 of 4 runs right** on maps with a grid; SC-009's 80% target stands.
+- **Shown estimates updated** (`llm/configs/claude.toml`): quick about 25 s and $0.10 (the
+  $0.085 mean above plus the difference between the Opus and the Sonnet size step, rounded
+  up), deep about 70 s and $0.32. Before: 20 s / $0.07 and 60 s / $0.27.
+- Cost of this run: $0.08. Reference evaluation in all: $1.71.
