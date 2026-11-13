@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from data.rasterize import BACKGROUND, LIGHT, PORTAL, WALL
-from eval.metrics import boundary_f1, iou_f1, mean_scores, score
+from eval.metrics import boundary_f1, iou_f1, mean_scores, portal_recall, score
 
 PPG = 32
 
@@ -61,3 +61,38 @@ def test_shape_mismatch_raises(truth: np.ndarray) -> None:
     """Masks of different sizes are an error, not a silent broadcast."""
     with pytest.raises(ValueError, match="differ in shape"):
         score(truth[:64], truth, PPG)
+
+
+def portals(*midpoints: tuple[float, float]) -> dict:
+    """A Universal VTT dict with one horizontal 1-square portal centred on each midpoint."""
+    return {
+        "portals": [
+            {"bounds": [{"x": x - 0.5, "y": y}, {"x": x + 0.5, "y": y}]} for x, y in midpoints
+        ]
+    }
+
+
+def test_portal_recall_perfect_match():
+    """Every labeled portal predicted in place: 1.0."""
+    assert portal_recall(portals((2, 3), (7, 1)), portals((2, 3), (7, 1))) == 1.0
+
+
+def test_portal_recall_none_found():
+    """No predictions: 0.0."""
+    assert portal_recall(portals(), portals((2, 3))) == 0.0
+
+
+def test_portal_recall_two_predictions_on_one_door_count_once():
+    """Matching is one to one."""
+    assert portal_recall(portals((2, 3), (2.1, 3)), portals((2, 3), (8, 8))) == 0.5
+
+
+def test_portal_recall_tolerance_is_half_a_square():
+    """A prediction 0.6 squares away does not count; 0.4 does."""
+    assert portal_recall(portals((2.6, 3)), portals((2, 3))) == 0.0
+    assert portal_recall(portals((2.4, 3)), portals((2, 3))) == 1.0
+
+
+def test_portal_recall_without_labeled_portals_is_one():
+    """Nothing to find counts as all found."""
+    assert portal_recall(portals((1, 1)), portals()) == 1.0

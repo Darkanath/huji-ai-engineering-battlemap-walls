@@ -78,3 +78,40 @@ def mean_scores(rows: list[dict[str, float]]) -> dict[str, float]:
         values = [r[key] for r in rows if not math.isnan(r[key])]
         out[key] = sum(values) / len(values) if values else math.nan
     return out
+
+
+PORTAL_TOLERANCE = 0.5  # squares between a labeled portal's midpoint and a predicted one's
+
+
+def _midpoints(uvtt: dict) -> list[tuple[float, float]]:
+    """Each portal's midpoint in grid squares, from its two bounds."""
+    out = []
+    for portal in uvtt.get("portals", []):
+        a, b = portal["bounds"]
+        out.append(((a["x"] + b["x"]) / 2, (a["y"] + b["y"]) / 2))
+    return out
+
+
+def portal_recall(pred_uvtt: dict, true_uvtt: dict, tolerance: float = PORTAL_TOLERANCE) -> float:
+    """Share of labeled portals that were found, from two Universal VTT dicts.
+
+    A labeled portal counts as found when a predicted portal's midpoint lies within
+    `tolerance` squares of its midpoint. Matching is one to one, closest pairs first, so two
+    predictions on one door count once. 1.0 when the label has no portals. This makes "most
+    doors found" a number (spec SC-004) where pixel IoU on thin portals is too strict.
+    """
+    truth, pred = _midpoints(true_uvtt), _midpoints(pred_uvtt)
+    if not truth:
+        return 1.0
+    pairs = sorted(
+        (math.dist(t, p), i, j)
+        for i, t in enumerate(truth)
+        for j, p in enumerate(pred)
+        if math.dist(t, p) <= tolerance
+    )
+    used_true, used_pred = set(), set()
+    for _, i, j in pairs:
+        if i not in used_true and j not in used_pred:
+            used_true.add(i)
+            used_pred.add(j)
+    return len(used_true) / len(truth)
