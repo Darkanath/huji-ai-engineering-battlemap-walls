@@ -77,7 +77,8 @@ Paid steps are marked. The whole list costs about $0.60.
 
 ### D. Map size worked out by the model (User Story 4) — paid, about $0.10 each
 
-1. Upload a map with a visible grid and leave the map size alone. Click "Suggest walls".
+1. Upload a map with a visible grid (for example the image of `data/reference/dd04_a.dd2vtt`;
+   `data/test/map-26x28.jpeg` has no grid lines) and leave the map size alone. Click "Suggest walls".
 2. Expected: the fields show the size the model found, with "Detected from the image"; the
    option is now off.
 3. Upload a map with no grid (for example `data/reference/dd04_d.dd2vtt`'s image). Click
@@ -121,3 +122,24 @@ time and cost in the config are updated to what was measured.
 - Sections 1 to 3 pass.
 - Section 4 is run once approved, and its results are recorded.
 - The Roll20 import in A.6 is confirmed by the owner.
+
+## Validation run (2026-11-13)
+
+Driven over HTTP with `gradio_client` against the real app (`app.main.build_ui`, the same
+handlers and model calls as the page), not by clicking in a browser: the layout, the legend
+and the rendered colors still need a look by eye. Previews were saved and checked by eye.
+Paid part: about $0.52 (A $0.05, B $0.25, D $0.16 run twice, because the first run's size
+fields were lost in the output).
+
+| Scenario | Result |
+| --- | --- |
+| 1. Build, tests, lint | Pass: image builds with uv; 260 tests; ruff clean (commit `136bc1f`) |
+| A. Fast pass, typed 26 x 28 | Pass. "Working… N s" each second; Sonnet 5.5 (medium), 10 s, about $0.05, 17 walls, 0 portals, 2 lights, with the model's note (it says itself it found no doors). `.dd2vtt` and `.uvtt` byte-identical, `map_size` 26 x 28 |
+| A.6 Roll20 import | Not done: owner's step (T063) |
+| B. Deeper examination | Pass. Mask replaced; Opus 5.5 (medium), 53 s, about $0.25, 24 walls, 11 portals, 2 lights; preview shows walls, doors and both chandeliers in place |
+| C.1 No key | Pass: "No API key is set up…", no stack trace, progress shown first |
+| C.2 No network (container with no network, real key) | Pass: "Couldn't reach the AI provider…" |
+| C.3 `.gif`, file over 20 MB | Refused before the app's handler, by Gradio itself, with its own wording ("Invalid file type. Please upload a file that is one of these formats: …"; the size limit). Nothing is sent to the model. The texts in contracts/ui.md appear only for files that pass Gradio's check (e.g. a text file renamed `.png`: tested) |
+| C.4 Size 0 or 201 | Pass: range message; a pass click with 0 starts nothing |
+| D. Map size from the image | `map-26x28.jpeg` (no grid lines drawn): "No grid was found…", traced on 25 x 25, option stays on. Correct for that image, but it is not a gridded map; detection on gridded maps is measured in docs/results.md (Opus 4 of 4). `dd04_d` image (no grid): "No grid was found…", correct |
+| E. Map size change | Pass: 13 x 14 typed with a mask on screen, no pass, the download's `map_size` is 13 x 14 |
