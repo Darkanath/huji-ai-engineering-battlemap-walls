@@ -218,3 +218,52 @@ Command: `python -m llm.run --maps dd07_a --profile quick --detect-size --run
   $0.085 mean above plus the difference between the Opus and the Sonnet size step, rounded
   up), deep about 70 s and $0.32. Before: 20 s / $0.07 and 60 s / $0.27.
 - Cost of this run: $0.08. Reference evaluation in all: $1.71.
+
+## Roll20 import from the app, and a map-size miss (T063, 13.11)
+
+The owner uploaded a `.dd2vtt` downloaded from the app to Roll20 (Page Menu -> Upload
+Background). The import worked: walls, doors and lights came in and fog of war followed the
+walls. The week-5 milestone is met.
+
+The map used was a third-party map (`runs/test-maps/lakeside-tavern-2.png`, 2240 x 1280 px,
+not committed). Its grid is 64 px per square, so the map is **35 x 20** squares; measured by
+folding the grass bands' brightness profile, where both axes peak at 64 px. The grid is faint
+and visible only on the grass around the building; the floor art covers it.
+
+- **In the app, the map-size step reported 56 x 32** (40 px squares), so Roll20 drew its grid
+  at the wrong scale. 56 x 32 has the same proportions as 35 x 20, so the non-square-cells
+  warning could not catch it. Correcting the size in the app and accepting again fixes the
+  file without a new pass.
+- **A single re-run of the size step alone** (Opus, $0.03) answered 35 x 20, but its own
+  note said the lines were too faint to count and it estimated from the spacing. Detection on
+  maps like this is unreliable; one run each cannot say how often it fails.
+- **Why:** the overview is downscaled to 1300 px (64 px squares become about 37 px, and the
+  faint lines nearly vanish); the top and left edge strips are 12% of the map and mostly
+  show the building, with only about 55 px of grass above it.
+- The size step was measured only on the owner's Dungeondraft maps (clear grid lines) before
+  this; this is the first map with a faint, partly covered grid.
+
+### Map-size step with pixel rulers (13.11)
+
+One change to the size step only: every image it sends gets pixel rulers in its margins,
+labeled in original-image pixels; the model reports the square size in pixels as well as the
+size in squares, and a count more than 5% off image size / square size is replaced by the
+ruler reading. Opus, two runs per map. Command: `python -m llm.run --reference --image
+runs/test-maps/lakeside-tavern-2.png --squares 35 20 --size-only` (runs
+`runs/20261113-size-ruler-1/`, `-2/`). Cost $0.28.
+
+| Map | Before (old views) | With rulers |
+| --- | --- | --- |
+| `dd04_a` tavern, `dd06_a` mine | right in every run | 4 of 4 right |
+| `dd07_a` castle | 4 of 4 right | **0 of 2** (18 x 18, 27 x 27) |
+| `dd04_d` no grid | "no grid" 2 of 2 | 1 of 2 ("no grid"; once 35 x 35 from floor tiles) |
+| lakeside tavern, faint grid | 1 of 2 (the app's run said 56 x 32) | **2 of 2** |
+
+- The model read the grid lines correctly but mishandled the scale: on the castle it found
+  lines 70 px apart (right) and then "converted" them with a scale it misread from the ruler.
+  Its counts and square sizes agreed with each other, so the 5% check never fired.
+- **Not adopted:** better on the faint grid, worse on the castle and the no-grid map.
+- **Decision (owner):** no more spending on detection for now. "Detect map size from the
+  image" is **off by default** (`[app] detect_size_default = false`); the user ticks it when
+  wanted. The size note now shows the implied px per square (e.g. "56 x 32 squares, 40 px
+  per square"), so a wrong count is easy to spot and correct for free.
