@@ -1,108 +1,101 @@
-# Battlemap Auto-Walling — Project Plan
+# Battlemap Tracer — Project Plan
 
-Oct 20, 2026 · @Tal
+Oct 20, 2026 · @Tal · rewritten 13.11.2026 around the Claude tracer
 
 ## Overview
 
-Upload a battlemap image, get back a .dd2vtt file with walls, doors, windows and light sources already placed, ready to drop into Roll20. The core is a semantic segmentation model trained in PyTorch, wrapped in a pipeline that turns its pixel masks into Universal VTT line-of-sight data.
+Upload a battlemap image, get back a Universal VTT file (`.dd2vtt` or `.uvtt`) with walls, portals (doors and windows) and light sources already placed, ready to drop into Roll20. The core is a **Claude wall tracer**: a large vision model reads the map image and answers with walls, portals and lights in grid squares, which a small writer turns into the file.
 
-**Why it matters:** tracing walls by hand for dynamic lighting takes a GM 20–30 minutes per map. Existing tools (Auto-Wall, Dungeon Channel) use classical edge or color detection and struggle with textured maps and furniture. A learned model can tell a wall from a table.
+**Why it matters:** tracing walls by hand for dynamic lighting takes a GM 20–30 minutes per map. Existing tools (Auto-Wall, Dungeon Channel) use classical edge or color detection and struggle with textured maps and furniture. A model that understands the picture can tell a wall from a table.
 
-**Final presentation:** 23.12.2026 (session 33). About 9 weeks from today.
+**What changed on 13.11.** The plan until then was a U-Net trained on synthetic maps and fine-tuned on real ones. On 13.11 the course staff allowed a large model in place of a trained one. A spike and two model comparisons the same day ([results.md](results.md)) showed Claude placing walls, portals and lights straight from the image, well ahead of the stage-1 U-Net and the Canny baseline on the two maps tried. Training stopped there. What was built for it stays in the repo as the record of the first approach (see "First approach" below) and supplies two rows of the final comparison.
+
+**Final presentation:** 23.12.2026 (session 33).
 
 **Success criteria:**
 
-- The trained model beats a classical Canny/color baseline on a held-out test set, on both pixel and visibility metrics.
-- A Dungeondraft- or Dungeon Alchemist-style map produces a .dd2vtt that imports into Roll20 with usable fog of war after at most a few minutes of manual fixes.
-- A working web demo: upload, preview overlay, download.
-- An honest error analysis, including where the model fails (outdoor and photoreal maps).
+- The tracer beats the Canny baseline and the stage-1 U-Net on the real maps, scored the same way.
+- A Dungeondraft- or Dungeon Alchemist-style building map produces a file that imports into Roll20 with fog of war following the walls and no manual fixes; a cave map needs at most a few minutes of fixes.
+- A working web app: upload, fast suggestion, optional deeper examination, accept, download. Every paid action shows its expected time and cost before the click.
+- An honest error analysis, including where the tracer fails (caves, outdoor and photoreal maps) and what it costs per map.
+- The first approach is shown too: what was trained, how it was validated, and why it was dropped.
 
-* Training and validation are shown end to end: how the data was split, how the model was trained, and the validation and test results (see Training & validation report).
+The feature-level requirements and measurable targets are in [`specs/001-battlemap-tracer-app/spec.md`](../specs/001-battlemap-tracer-app/spec.md); the project's rules are in [`.specify/memory/constitution.md`](../.specify/memory/constitution.md).
 
 ## Course requirements
 
-From the course brief (`Graduation Project.pdf`, received 26.10). The plan already covered most of it; the items marked **added** were new.
+From the course brief (`Graduation Project.pdf`, received 26.10).
 
-- An end-to-end AI/ML system on **real data** that solves a practical problem, with a working demo. Core challenge here: train a model (plus a functional prototype).
+- An end-to-end AI/ML system on **real data** that solves a practical problem, with a working demo.
+- The brief's core challenge was to train a model. **13.11: the course staff allowed a large model in place of a trained one.** The project keeps its trained U-Net (stage 1) as a measured comparison.
 - Teams of up to 3; this project is solo.
-- **Added:** start data collection, **cleaning and EDA** early, and refine the goal from what the data shows (see Data cleaning & EDA).
+- Start data collection, **cleaning and EDA** early, and refine the goal from what the data shows (see Data cleaning & EDA).
 - Plan milestones for data, modeling, evaluation and presentation (Timeline).
-- **Final presentation: up to 12 minutes, no code.** Suggested structure: title, motivation, problem definition, **literature / related work (added)**, data (source, size, key properties, **cleansing techniques**), methodology, results and conclusions, limitations and future work. Share what worked, what worked best and **what didn't work** (kept in `docs/lessons.md` from week 3 on).
+- **Final presentation: up to 12 minutes, no code.** Suggested structure: title, motivation, problem definition, literature / related work, data (source, size, key properties, cleansing techniques), methodology, results and conclusions, limitations and future work. Share what worked, what worked best and **what didn't work** (kept in `docs/lessons.md`).
 - **Submission (confirmed 26.10):** the presentation itself (up to 12 minutes, given by me), a live demo and the code repository.
 
 ## Scope
 
-The MVP targets indoor, top-down maps in a Dungeondraft-like or Dungeon Alchemist-like style. Outdoor maps (camps, ruins, cave mouths) are the first stretch goal and part of the demo. Other styles are reported as a limitation.
+The app targets indoor, top-down maps in a Dungeondraft-like or Dungeon Alchemist-like style. Caves work with the deep pass. Other styles are reported as a limitation.
 
 |  | In | Out or stretch |
 | --- | --- | --- |
-| Map types | Indoor dungeons, buildings, taverns | Outdoor Dungeondraft-style maps: stretch goal, 5–8 added to training and shown in the demo. Photoreal maps: hard test set only, reported honestly |
-| Classes | Background, wall, portal (doors and windows together), light (one class; brightness from a size tier) | Sight-blocking objects like pillars (stretch); light color, flicker, learned brightness |
-| Grid | Auto-detect from a visible grid; user enters size in squares as fallback | Hex grids |
+| Map types | Indoor dungeons, buildings, taverns, caves | Outdoor and photoreal maps: test set only, reported honestly |
+| Classes | Background, wall, portal (doors and windows together), light (one class; brightness from a size tier) | Sight-blocking objects like pillars; light color, flicker, per-light brightness |
+| Grid | The model works out the map size in squares during a pass; the user can always type it, and a typed size wins | Hex and isometric grids; a separate local grid detector |
 | Multi-floor images | User crops each floor before upload | Automatic floor splitting |
-| Output | .dd2vtt with walls, portals, lights, embedded image | Native Roll20 API integration |
+| Output | `.dd2vtt` / `.uvtt` with walls, portals, lights, embedded image at 70 px per square | Other formats; native Roll20 API integration; VTTs other than Roll20 as a tested target |
+| App | Fast pass, deep pass, accept and download; clear messages on failure | Editing the mask by hand; undo; accounts; keeping uploads after the session |
 | Never | Traps and secret doors (not visible in the image by design) |  |
 
 ## System architecture
 
-Two pipelines share one model: training runs offline, and inference runs once per uploaded map.
+One pipeline, run once per uploaded map:
 
-&#91;embedded content: system architecture · training and inference pipelines\]
+1. **Upload and check.** The image type, file size and map size are validated before anything is sent out.
+2. **Views.** The map is drawn with a labeled square grid: the whole map plus its four quarters at higher zoom (`llm/views.py`).
+3. **Trace.** Claude receives the views, can ask for closer crops, and submits walls (polylines and arcs), portals and lights in grid squares. Each submission is drawn over the map and shown back to the model, which can correct it (`llm/agent.py`, `trace_map`). Limits on turns, views, submissions and cost per map are in `llm/configs/claude.toml`.
+4. **Map size.** When the user has not typed one, the model also works out the map's size in squares in the same pass.
+5. **Preview.** The answer is drawn over the map for the user (walls, portals and lights, each distinct).
+6. **Write.** On accept, the answer becomes a Universal VTT file with the image embedded at 70 px per square (`postprocess/uvtt.py`).
 
-The .dd2vtt rasterizer is shared: it turns labels into training masks and also scores predictions during evaluation.
+**Two profiles** share this pipeline:
 
-## Data strategy
+| Profile | Model | Time per map | Cost per map | Wall boundary F1, castle / mine | Portals on the castle |
+| --- | --- | --- | --- | --- | --- |
+| `quick`: "Suggest walls" | Sonnet 5.5, medium effort | about 25 s | about $0.10 | 0.91–0.97 / 0.55–0.66 | none found |
+| `deep`: "Deeper examination" | Opus 5.5, medium effort | about 70 s | about $0.32 | 0.99 / 0.88–0.89 | most found (0.94 recall) |
 
-Three kinds of data, built in this order: synthetic maps for pretraining, a small set of **real maps** made by hand in two tools (Dungeondraft and Dungeon Alchemist) for fine-tuning and validation, and a hand-labeled test set that the model never trains on. Each tool's maps are a dataset of their own (`dungeondraft`, `dungeon_alchemist`), split by layout separately; together they are the real data.
+Measured on the reference maps with the map-size step, one to three runs per map (v2 harness, [results.md](results.md), 13.11). The map size is worked out by Opus in both passes. The fast pass is a cheap first draft, good on buildings and weak on caves and doors; the deep pass is what fixes those. The app says so next to the button.
 
-| Dataset | Size target | Labels come from | Used for |
+The `.dd2vtt` rasterizer (`data/rasterize.py`) is shared by evaluation: it turns both a label file and a model's answer into class masks, so every predictor is scored the same way.
+
+## Data
+
+The data is now used for **evaluation**, not training. Nothing is sent to the model except the image being traced.
+
+| Dataset | Size | Labels come from | Used for |
 | --- | --- | --- | --- |
-| Synthetic | 500 to start, more only if it helps; all generated by script | The Python generator itself (exact) | Pretraining |
-| Dungeondraft | 13 layouts × 4 style variants (`dd01`–`dd13`) | The .dd2vtt export (exact) | Fine-tuning + validation |
-| Dungeon Alchemist | 6+ layouts × 4 style variants (`da01`–`da06` first, more as time allows: DA maps are fast to make) | The .dd2vtt export, light ranges mapped to tiers | Fine-tuning + validation |
-| Test set | 10–15 maps | Hand-traced, then saved as .dd2vtt | Final evaluation only |
+| Dungeondraft | 8 layouts × 4 style variants (`dd01`–`dd08`), 32 maps | The .dd2vtt export (exact) | Evaluation of every predictor |
+| Dungeon Alchemist | 1 layout, 2 variants so far (`da01`) | The .dd2vtt export, light ranges mapped to tiers | Evaluation |
+| Test set | Target 10–15 published maps; none traced yet, 1 image collected | Hand-traced, then saved as .dd2vtt | Final evaluation only, run once |
+| Synthetic | 500 maps, generated by script | The generator itself (exact) | First approach only: trained the stage-1 U-Net |
 
-### Key tool: .dd2vtt → mask rasterizer
-
-Build this first; every dataset depends on it. It reads a .dd2vtt, draws each `line_of_sight` polyline as a thick line (wall class) and each portal as a thick segment (door or window class) onto an empty image of the map's pixel size. Coordinates are in grid units, so multiply by `pixels_per_grid`. Line thickness ≈ the visible wall thickness, about 0.2–0.3 squares.
-
-**Decided (20.10): inputs are images only (.png, .jpg, .webp); training labels come only from the .dd2vtt.** The .dd2vtt `portals` carry no door/window type, so the MVP uses one **portal** class for both. Roll20 imports every portal as a door, and the GM flips the few windows by hand. The rasterizer prototype (`rasterize.py`) produced correct masks on the first demo map: wall 7.2% of pixels, portal 0.6%, which confirms class weighting is needed.
-
-**Decided (21.10): light sources are a 4th class.** The .dd2vtt `lights` give each light's `position` and `range`. Brightness cannot be read from the image (the same torch sprite could be 20 ft or 40 ft of light), so the model does not learn it. Each light gets a **size tier** instead (small: candle, torch; medium: lantern, brazier, campfire; large: bonfire), set by its `range` when the map is made. The rasterizer draws a disc whose radius depends on the tier (0.25 / 0.40 / 0.60 squares), under the walls so a wall torch never cuts a gap in a wall. At inference, each light blob's centroid is the position and its area picks the tier; a lookup table (D&D 5e values where they exist, editable in the app) gives the range. The tier table and the rules are in `labeling-rules.md`. Lights rank below walls and portals: the model trains with 4 classes from the first run (so no extra runs), but the light post-processing, metric and app controls come after the week 5 milestone, and are cut first if time runs short.
-
-### Synthetic generator
-
-1. Random rooms-and-corridors layout on a 25×25-square grid by default (BSP split or random placement). Leave some walls open: gaps of 1–3 squares with no door, so the model learns that an opening is not a broken wall.
-2. Render floors and walls with procedural textures (planks, tiles, checkerboards, stone; CC0 textures can be added later); vary wall thickness, color and outline.
-3. Place doors and windows on wall segments.
-4. Place light source sprites (torches on walls, braziers, campfires, bonfires), each with a light of its tier's `range`, plus some unlit fixtures as distractors.
-5. Scatter furniture sprites as distractors: tables, beds, barrels, rugs. This teaches the model what is *not* a wall.
-6. Optional overlays: grid lines, lighting tint, blur, JPEG noise.
-7. Save each map's image and its .dd2vtt together, written by the same script. The generator decided where every wall, portal and light goes, so the labels cost nothing and are exact; no manual work per map. The same rasterizer then handles synthetic and real data alike.
-
-**Built (21.10): generator v1** (`data/generator.py`, `data/synth/`). Building-style layouts (rooms sharing walls) and dungeon-style layouts (rooms joined by corridors), every room reachable through doors and gaps; everything is drawn procedurally, so no asset files are needed. Walls are horizontal and vertical only; diagonal and curved walls come from the real maps. Measured: about 2 s and 1.9 MB per map (image embedded as PNG).
-
-**Volume and storage.** Rendering one map takes about 2 seconds, so 500 maps is about 17 minutes on the laptop. At 70 px per square (Roll20's default; export Dungeondraft maps with its Roll20 grid preset), the default 25×25-square map is a 1750×1750 image, stored as JPEG (quality 90) at about 0.6 MB; masks stay PNG because JPEG would corrupt the class ids. With its .dd2vtt (which embeds the image again) and mask, that is about 3 MB per map, so 500 maps is about 1.5 GB. If the ablation shows more synthetic data helps, generate more to disk the same way. Every dataset is saved to disk, never generated on the fly, so it can be showcased and reproduced: each map keeps its image, .dd2vtt and mask, with a fixed random seed, and a manifest (CSV) lists every map's dataset, split and seed. A thumbnail contact sheet per dataset goes in the presentation.
-
-### Real maps: Dungeondraft and Dungeon Alchemist
-
-- Build rough 25×25-square maps fast: walls, doors, windows, at least 3 lit light sources of two or more tiers, a scatter of furniture. No detailing.
-- Every new layout follows `map-specs.md`: each targets a weakness of the first three Dungeondraft maps (diagonal and curved walls, caves, broken walls, wall-like furniture, dense rooms, lights of all tiers). `dd01`–`dd03` draw no lit light sources, so they stay as lights-free maps.
-- **Which tool:** Dungeondraft (`dd04`–`dd13`) for what needs precise control: curves, caves, ruins, outdoor maps, exact light placement. Dungeon Alchemist (`da01`–`da06`) for furnished interiors: it furnishes rooms automatically and renders a 3D-looking style, so it adds a second art style, closer to many published maps.
-- Export each layout 4 times (`a`–`d`) with different wall styles, floor textures, and lighting; at least one variant without grid.
-- **Decided (21.10): Dungeon Alchemist maps are used, after a pilot.** The pilot `da01` showed its .dd2vtt walls, portals and lights land on the drawn ones. Its light ranges are set per asset type, not by tier, so `data/retier_lights.py` maps them to tiers from a rules table (`data/configs/light_sources.toml`) and keeps the original export untouched.
-- The `.dungeondraft_map` source file is not used; labels come only from the .dd2vtt export.
+- **No more real maps are needed (decided 13.11).** `dd09`–`dd13` and `da02`–`da06` ([map-specs.md](map-specs.md)) were planned as training data and are dropped. A new map is made only if testing needs one.
+- **Development maps.** The tracer's prompt and views were tuned while looking at `dd06` (mine) and `dd07` (castle). Their scores are reported separately from the other layouts, the way a validation score is kept apart from a test score.
+- **Decided (20.10): inputs are images only (.png, .jpg, .webp); labels come only from the .dd2vtt.** The `.dungeondraft_map` source file is never used.
+- **Decided (21.10): one portal class.** The .dd2vtt `portals` carry no door/window type. Roll20 imports every portal as a door, and the GM flips the few windows by hand.
+- **Decided (21.10): light sources are a 4th class with a size tier.** Brightness cannot be read from the image (the same torch sprite could be 20 ft or 40 ft of light). Each light gets a tier (small: candle, torch; medium: lantern, brazier, campfire; large: bonfire); the model names the tier and a lookup table gives the range (`LIGHT_TIERS` in `data/rasterize.py`: 8 / 12 / 16 squares). In a label mask a light is a disc of 0.25 / 0.40 / 0.60 squares, drawn under the walls.
+- **Dungeon Alchemist** light ranges are set per asset type, not by tier, so `data/retier_lights.py` maps them to tiers from a rules table (`data/configs/light_sources.toml`) and keeps the original export untouched.
 
 ### Data cleaning & EDA
 
-The course asks for both, early, and the Data slide reports the cleansing techniques. Most checks already exist in the pipeline; this section names them so they can be shown.
-
 - **Cleaning (per map, before the manifest):** walls and portals line up with the image (rasterizer preview overlay); embedded image size = `map_size` × `pixels_per_grid`; light `range` matches a tier (the rasterizer stops otherwise); stacked duplicate lights merged; stacked or duplicate portals flagged (as in `dd01`); `objects_line_of_sight` from stray object shadows checked; Dungeon Alchemist lights re-tiered with the original kept. Every map dropped or fixed is noted in `map-log.md` with the reason.
-- **EDA notebook** (`notebooks/eda.ipynb`, week 3; **runs on Colab**, which has pandas and matplotlib, so the Docker image doesn't need them; it reads the same data pack as training, so test images stay on the laptop): maps and layouts per dataset and split; class pixel shares per map and dataset (wall, portal, light); wall thickness and portal width in squares; lights per tier; how far apart synthetic, Dungeondraft and Dungeon Alchemist are (color histograms, a few side-by-side crops). Its figures go straight into the Data slide.
+- **EDA** (`notebooks/eda.ipynb`, run 26.10; summary in [results.md](results.md)): maps and layouts per dataset, class pixel shares, wall thickness and portal width in squares, lights per tier, and how far apart synthetic, Dungeondraft and Dungeon Alchemist maps are. Its figures go into the Data slide.
 
 ### Labeling rules
 
-Write these down in week 1 and apply them everywhere:
+Full rules: [labeling-rules.md](labeling-rules.md). The same rules are given to the tracer in its prompt.
 
 - **Wall** = anything that blocks both sight and movement: building walls, palisades, cave walls, cliff faces.
 - **Door** = a gap in a wall with a door drawn in. An open archway is just a gap, no portal.
@@ -110,174 +103,133 @@ Write these down in week 1 and apply them everywhere:
 - **Not walls:** furniture, counters, rugs, trees, boulders, water.
 - **Light** = a lit light source drawn in the image (flame or lamp visible), with a size tier. Unlit fixtures and glow without a source are background.
 
-### Licensing
+### Licensing and privacy
 
-Train only on synthetic maps and maps you made (in Dungeondraft or Dungeon Alchemist; DA's terms allow personal and limited commercial use and say nothing about training). Published maps (e.g. Red Raspus) go in the test set only, are never redistributed, and are cited in the report. This also answers the VTT community's skepticism about AI tools trained on others' work.
+- Maps made for this project (Dungeondraft, Dungeon Alchemist) and synthetic maps are the only ones used beyond testing. Published maps (e.g. Red Raspus) go in the test set only, are never redistributed or committed, and are cited in the report.
+- Every traced image is sent to a third-party model provider (Anthropic). The app says so where the user uploads. The API key comes from the operator's `.env`; the user never enters one.
 
 ## Related work
 
 For the literature slide; one line each, filled in during week 8.
 
-- **VTT wall tools:** Auto-Wall and Dungeon Channel (classical edge and color detection; the baseline here copies their approach). Foundry's and Roll20's own tools need walls drawn by hand.
-- **Floor-plan parsing:** the closest research area. Raster-to-vector floor-plan conversion and the CubiCasa5k dataset (walls, doors and windows on real floor plans) use segmentation followed by vectorization, the same two stages as this project.
-- **Segmentation models:** U-Net and pretrained encoders (ResNet, MobileNet) for thin structures; Dice and focal loss for rare classes.
-- **Synthetic-to-real transfer:** pretraining on generated data, then fine-tuning on a small real set.
+- **VTT wall tools:** Auto-Wall and Dungeon Channel (classical edge and color detection; the Canny baseline here copies their approach). Foundry's and Roll20's own tools need walls drawn by hand.
+- **Floor-plan parsing:** the closest research area. Raster-to-vector floor-plan conversion and the CubiCasa5k dataset use segmentation followed by vectorization, the two stages of the first approach.
+- **Segmentation models:** U-Net and pretrained encoders for thin structures; Dice and focal loss for rare classes (first approach).
+- **Vision-language models on spatial tasks:** large models reading diagrams and plans with tool use (asking for crops, checking their own answer on an overlay), the approach the tracer uses.
+- **Synthetic-to-real transfer:** pretraining on generated data, then fine-tuning on a small real set (first approach; the gap it left is in results.md).
 
-## Model & training
+## The tracer: what was tried
 
-Start with a U-Net on a pretrained ResNet-18 encoder (`segmentation_models_pytorch`), 4 output classes (background, wall, portal, light). It is simple, well understood, and strong on thin structures.
+All measured on `dd07_a` (castle) and `dd06_a` (mine); numbers and costs in [results.md](results.md).
 
-**Scale normalization.** Before training and inference, resize every map so one grid square = a fixed size (32 px per square). Walls then always look about the same thickness, which makes the task much easier. This is why grid detection matters.
+1. **Spike (13.11).** Claude inside a working session, looking at the full image, four gridded quarters and a few close-ups: wall boundary F1 0.995 and 0.957. One look at the full image was not enough to place doors.
+2. **Tracer v1.** The same idea as an API pipeline, with the model choosing when to zoom in. Only Opus was usable; Sonnet and Haiku answered almost without zooming and missed the cave walls. High effort did not beat medium.
+3. **Tracer v2.** The four quarters are sent up front, so close reading no longer depends on the model asking. Every model improved: Opus portal IoU on the castle went from 0.25 to 0.70, Sonnet's cave boundary F1 doubled.
+4. **Model choice.** Fable 5.2 is the most accurate and the most expensive. Opus 5.5 is close on walls for about 60% of the cost, so it is the deep pass. Sonnet 5.5 is about four times cheaper and three times faster, so it is the default draft.
 
-**Training setup:**
+Open points for the tracer: caves stay the weak spot (no model asked for a closer view of the mine); results are one run per cell, so run-to-run spread is unknown; working out the map size inside the pass is not built or measured yet.
 
-- Random 256×256 crops; flips, 90° rotations, color jitter, hue shifts, blur, JPEG noise.
-- Loss: cross-entropy + Dice. Walls are thin and rare (roughly 5–10% of pixels depending on wall thickness; 7.4% on the demo map), portals rarer (under 1%) and lights rarer still (about 0.1–0.3%, *estimate*), so plain cross-entropy will predict "background" everywhere. Add class weights or focal loss if Dice alone is not enough.
-- Stage 1: train on synthetic data. Stage 2: fine-tune on the real maps (Dungeondraft and Dungeon Alchemist) with a lower learning rate.
-- Inference: sliding 256 windows with overlap, averaged at the seams.
-- Track every run (MLflow or Weights & Biases): config, metrics, sample predictions.
+## First approach (20.10–9.11): trained U-Net
 
-**Compute.** **Decided (21.10): training runs on Google Colab (GPU, paid subscription); everything else stays on the laptop.** Data, tests, evaluation, inference and the app run locally under Docker on the CPU; only `train.train` runs on Colab, from a notebook that takes a zipped pack of the 32 px training data from Google Drive and writes checkpoints and logs back to Drive. A GPU turns overnight runs into runs of minutes to an hour, which leaves room for checks and retries. The run list stays fixed. The original CPU setup below still applies to the CPU fallback and to local inference:
+Kept in the repo, frozen: `train/`, `data/generator.py` + `data/synth/`, `notebooks/colab_train.ipynb`, and [training.md](training.md).
 
-- **Smaller model:** a ResNet-18 encoder instead of ResNet-34. Freeze the encoder for the first epochs and train only the decoder, then unfreeze the last blocks.
-- **Smaller inputs:** train at 32 px per square (walls stay about 8 px thick) on 256×256 crops. Datasets are still saved at 70 px per square (Roll20's default) and scaled down when loaded.
-- **Fixed crop budget per epoch:** sample about 2,000 crops per epoch rather than every crop of every map. On the CPU a full run takes hours (overnight); on Colab much less.
-- **CPU settings:** recent PyTorch already uses Intel's CPU math libraries. Set the thread count to the physical cores, use channels-last memory format, and try bfloat16 autocast if the CPU supports it.
-- **Fewer, planned runs:** each ablation is a full run, so decide the run list up front and keep it to about 6 runs in total.
-- **Check for an Intel GPU:** if the machine has Intel Arc or Core Ultra graphics, PyTorch's XPU backend can use it and may be several times faster.
-- **Fallback:** if Colab is unavailable, the same code trains on the laptop CPU overnight.
-
-**Ablations to run** (these become the results section):
-
-1. Real-only vs. synthetic-only vs. synthetic → real fine-tuning.
-2. With vs. without scale normalization.
-3. Encoder: ResNet-18 vs. MobileNetV3 (accuracy vs. CPU speed; ties to session 18 on vision architectures).
-
-## Post-processing
-
-Turning masks into clean line segments is about half the engineering work. Budget for it.
-
-1. **Clean the mask:** morphological close to bridge small gaps, with a kernel well under the narrowest real opening (about 0.25 square) so doorless openings stay open, remove blobs under a minimum area (stray table edges).
-2. **Skeletonize** the wall mask (`skimage.morphology.skeletonize`) to get 1-pixel centerlines.
-3. **Trace** the skeleton into polylines (graph walk from endpoints and junctions; `skan` can help).
-4. **Simplify** each polyline with Douglas–Peucker (`cv2.approxPolyDP`); optionally snap near-horizontal and near-vertical segments to the axes.
-5. **Portals:** each connected portal blob → its principal axis → one segment. Cut the wall polyline where a portal crosses it, so the door is not also a wall.
-6. **Lights:** each light blob (after dropping tiny ones) → centroid = position; equivalent radius → nearest tier; tier → `range` and `intensity` from `postprocess/configs/lights.toml`.
-7. **Convert** pixel coordinates to grid units (÷ `pixels_per_grid`), undoing the scale normalization.
-8. **Write** the .dd2vtt: `format`, `resolution`, `line_of_sight`, `portals`, `lights`, and the base64 image.
-
-**Check it in Roll20 early.** In week 2, write a hand-made .dd2vtt for one test map and upload it, so the writer is proven before the model exists. Include one light of each tier, to see how Roll20 turns `range` and `intensity` into bright and dim light.
+- **Synthetic generator:** rooms-and-corridors and building layouts on a 25×25 grid, procedural textures, doors, windows, lights of all tiers, furniture as distractors, doorless gaps. 500 maps, each saved with its image, .dd2vtt, mask and seed, listed in the manifest.
+- **Model:** U-Net with a pretrained ResNet-18 encoder, 4 classes, 256×256 crops at 32 px per square, cross-entropy + Dice with class weights. Trained on a Colab GPU; everything else on the laptop CPU.
+- **Stage 1 (R1, 26.10):** synthetic only. On synthetic validation: wall IoU 0.90, boundary F1 0.996. On real validation (`dd03`): wall IoU 0.52, boundary F1 0.84, about level with Canny on boundary F1 but able to find portals.
+- **What it showed:** a clear synthetic-to-real gap. Real-validation boundary F1 plateaued while the training loss kept falling.
+- **Not done:** stage 2 (fine-tuning on real maps), the ablations, mask-to-polyline post-processing, ONNX export. The comparison with the tracer is therefore not a fair fight for the U-Net, and the presentation says so.
 
 ## Evaluation
 
-The headline result: trained model vs. a classical baseline on the same test set, measured three ways, from pixels up to what players actually see.
+The headline result: the tracer (both profiles) against the Canny baseline and the stage-1 U-Net, on the same maps, scored the same way.
 
-| Level | Metric | What it tells you |
-| --- | --- | --- |
-| Pixel | IoU and F1 per class | Standard segmentation quality |
-| Boundary | Wall F1 with a tolerance of \~0.1 square | Fair to thin structures; a wall 2 px off is not wrong |
-| Gameplay | Visibility IoU (below) | Whether fog of war behaves correctly |
-| Objects | Light F1 (a predicted light matches a true one within 0.5 squares) and tier accuracy on matched lights | Whether light sources are found and sized right |
-| Practical | Minutes of manual fixing in Roll20 per map | What a GM actually saves |
+| Level | Metric | What it tells you | Status |
+| --- | --- | --- | --- |
+| Pixel | IoU per class | Standard segmentation quality | Built |
+| Boundary | Wall F1 with a tolerance of 0.1 square | Fair to thin structures; a wall 2 px off is not wrong. The main wall metric | Built |
+| Map size | Share of maps whose size the model gets exactly right | Whether the user can skip counting squares | To build with the app |
+| Cost | Estimated cost and time per map | What a suggestion costs | Built (run log) |
+| Practical | Minutes of manual fixing in Roll20 per map | What a GM actually saves | By hand, weeks 6–8 |
+| Gameplay *(stretch)* | Visibility IoU: ~100 viewpoints per map, visibility polygon with predicted vs true walls | Whether fog of war behaves correctly | Not built |
+| Objects *(stretch)* | Light F1 (match within 0.5 squares) and tier accuracy | Whether lights are found and sized right | Not built |
 
-**Visibility IoU.** Sample \~100 random viewpoints inside each map. For each, compute the visibility polygon with the predicted walls and with the true walls, and take their IoU. Average across viewpoints. This rewards getting the walls that matter right and punishes gaps that leak sight, even if they are only a few pixels wide.
-
-**Baseline.** Canny edges + contour → wall segments, the same approach Auto-Wall uses. Tune its thresholds once on the validation set, then freeze it. It predicts no portals and no lights.
-
-**Reporting.** Results on two test splits: the in-domain set (Dungeondraft-like and Dungeon Alchemist-like) and the hard set (outdoor, photoreal, like the snowy camp map). Include a gallery of failure cases with a sentence on each.
-
-## Training & validation report
-
-The presentation shows how the model was trained and validated, not just the final score. Plan this section of the report from day one, because every item comes from the run logs.
-
-### How: splits
-
-- **Split by map, never by crop.** Crops from one map stay in one split; otherwise validation leaks training data and scores look too good.
-- **Style variants stay together.** All exports of one layout go in the same split.
-- **Synthetic:** 90% train, 10% validation.
-- **Dungeondraft and Dungeon Alchemist:** each about 70% train, 15% validation, 15% test, by layout.
-- **Test set:** the hand-labeled maps plus the Dungeondraft and Dungeon Alchemist test layouts. Run once, at the end, after the model is chosen.
-
-### What: the exhibits
-
-1. **Data summary:** maps, crops and class pixel share per split.
-2. **Training curves:** training and validation loss, plus validation wall IoU, per epoch, for both stages (synthetic pretraining, then fine-tuning). Mark the chosen checkpoint: best validation wall boundary F1.
-3. **Learning progression:** image, ground truth and prediction side by side for 4–6 validation maps, at an early, middle and final epoch.
-4. **Results table** (below), once for the in-domain test set and once for the hard set.
-5. **Failure gallery:** the worst test predictions, each with one line on why it failed.
+- **How answers are scored:** the tracer's answer is written as a .dd2vtt, rasterized like a label, and compared at 32 px per square. Wall IoU is harsh on a hand-traced cave line that sits a fraction of a wall width off the label; boundary F1 is the fair metric there.
+- **Baseline:** Canny edges + contours, the approach Auto-Wall uses. Retune its thresholds once on the real maps, then freeze it. It predicts no portals and no lights.
+- **Full evaluation run:** all 34 real maps with both profiles, about $2.50 on Sonnet plus $9 on Opus. A paid run of this size is approved on its own before it starts.
+- **Test set:** run once, at the end, after the harness is frozen.
+- **Reporting:** development maps (`dd06`, `dd07`) apart from the rest; buildings apart from caves; the test set apart from both. A gallery of failure cases with a sentence on each. Every table states how many runs are behind each cell.
 
 ### Results: table to fill in
 
-Each row is one trained model; together they cover the baseline and the data ablation.
+| Predictor | Wall IoU | Wall boundary F1 | Portal IoU | Light IoU | Map size right | Cost / map | Time / map | Fix time (min/map) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Canny baseline |  |  | 0 | 0 | - | 0 |  |  |
+| U-Net, synthetic only (R1) |  |  |  |  | - | 0 |  |  |
+| Claude tracer, `quick` (Sonnet 5.5) |  |  |  |  |  |  |  |  |
+| Claude tracer, `deep` (Opus 5.5) |  |  |  |  |  |  |  |  |
 
-| Model | Wall IoU | Portal IoU | Wall boundary F1 | Visibility IoU | Light F1 | Tier acc. | Fix time (min/map) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Canny baseline |  |  |  |  | 0 | - |  |
-| U-Net, real only |  |  |  |  |  |  |  |
-| U-Net, synthetic only |  |  |  |  |  |  |  |
-| U-Net, synthetic → real |  |  |  |  |  |  |  |
+## Application
 
-Log every run (MLflow or Weights & Biases) so the curves and tables export directly into the slides.
+One page, Python only (Gradio). Full behaviour: the spec; build plan: `specs/001-battlemap-tracer-app/` and [app-plan.md](app-plan.md).
 
-## Application & deployment
-
-A small web app is enough: upload, preview, download. Keep it thin so the time goes into the model.
-
-- **Backend:** FastAPI. `POST /analyze` takes the image (+ optional squares-across), returns the .dd2vtt plus a preview PNG with walls, portals and lights overlaid in color.
-- **Frontend:** Gradio, so the whole project stays in Python: upload, the overlay preview, the light tier table (bright and dim per tier, pre-filled, editable), a download button.
-- **Model serving:** export to ONNX for CPU inference; a 256-tile U-Net runs fast enough without a GPU.
-- **Packaging:** everything runs on the laptop under Docker, on an Ubuntu 24.04 base image. One image covers data generation, evaluation and the web app (and CPU training as a fallback), started with Docker Compose; model training itself runs on Colab. Install the CPU-only PyTorch build (much smaller, no CUDA). Mount the datasets, checkpoints and run logs as volumes so they persist outside the container and can be showcased. Give Docker enough CPU cores and RAM (Docker Desktop caps both by default). To use an Intel GPU from a container, pass the host's /dev/dri device through. Optional: push the same image to a cloud service for session 30 (Cloud Deployment, 07.12).
-- **Observability:** log inference time, map size and wall count per request. Lines up with sessions 29 and 31.
-- **Repo layout:** `data/` (generator, rasterizer), `train/`, `eval/`, `postprocess/`, `app/`, `notebooks/`. Open source it under MIT once the course is done.
+- **Upload** an image (`.png`, `.jpg`/`.jpeg`, `.webp`, up to 20 MB). A new upload clears the previous result.
+- **Map size** in squares, pre-filled 25 × 25, with "detect map size from the image" on by default. A typed size wins.
+- **Suggest walls:** the fast pass. Shows the mask over the map and a status line: model, time, estimated cost and the model's note on what it was unsure of.
+- **Deeper examination:** enabled once a suggestion exists; a fresh trace with the stronger model that replaces the mask. A note says when it is worth paying for.
+- **Accept mask:** always visible; downloads the mask on screen as `.dd2vtt` or `.uvtt`.
+- **While a pass runs:** a progress indicator with elapsed time; the pass buttons are locked; the mask on screen can still be accepted.
+- **On failure** (refusal, usage or rate limit, missing or invalid key, no network, timeout, unreadable response): a plain-language message, no crash, and any earlier mask stays.
+- **Local first (decided 13.11):** the app, the data and every tool run on the laptop. The only thing that leaves the machine is the model call, made with the project owner's API key. Cloud deployment is optional and comes, if at all, after everything works locally.
+- **Packaging:** everything runs on the laptop under Docker (Ubuntu 24.04, Python 3.12, CPU only), started with Docker Compose; the app is served on port 7860. App logic lives in plain functions apart from the UI, so tests run it with a fake client and never make a paid call.
 
 ## Timeline
 
-The plan front-loads data and the end-to-end path, so a working (if rough) Roll20 import exists by 23.11 and the last month goes to evaluation, deployment and the write-up.
+Weeks 1–3 built the first approach; week 4 is the pivot; the app and the full evaluation follow, and the last two weeks are analysis and the presentation. Week-by-week tasks: [roadmap/](roadmap/README.md).
 
-&#91;embedded content: project timeline · 8 workstreams, 3 milestones\]
-
-**Week by week:**
-
-1. **20–26.10:** Confirm course requirements. Write labeling rules (lights added 21.10). Build the .dd2vtt → mask rasterizer. Set up the repo and Docker. Make 3 Dungeondraft maps (25×25, Roll20 grid preset). Upload a hand-made .dd2vtt to Roll20 to prove the format.
-2. **27.10–2.11:** Synthetic generator v1 (with lights). Light labels in the rasterizer, if not done in week 1. Canny baseline. Evaluation harness (pixel IoU, boundary F1). 5 more Dungeondraft maps (`dd04`–`dd08`, `map-specs.md`); check how Roll20 imports lights.
-3. **3–9.11:** Colab training setup (data pack, notebook, resumable runs). First U-Net trained on synthetic data on Colab; tune augmentation. 5 more Dungeondraft maps (`dd09`–`dd13`). Start hand-labeling the test set.
-4. **10–16.11:** 5 Dungeon Alchemist maps (`da02`–`da06`), then fine-tune on the real maps. Vectorization v1 and the .dd2vtt writer.
-5. **17–23.11:** First end-to-end run: map → model → .dd2vtt → Roll20. Add the visibility IoU metric. **Milestone: first Roll20 import.**
-6. **24–30.11:** Ablations. Grid detection. Light post-processing and light metrics. Finalize the test set (10–15 maps, including the hard set).
-7. **1–7.12:** Gradio app (with the light tier table), Docker Compose run on the laptop, optional cloud deploy (session 30 on 07.12). **Feature freeze 07.12.**
-8. **8–14.12:** Error analysis, failure gallery, model card. Use the workshop session (14.12) for feedback.
+1. **20–26.10:** Requirements, labeling rules, .dd2vtt → mask rasterizer, repo and Docker, first 3 Dungeondraft maps, Roll20 format check. *Done.*
+2. **27.10–2.11:** Synthetic generator, light labels, manifest, metrics, Canny baseline, evaluation harness, `dd04`–`dd08`. *Done.*
+3. **3–9.11:** Colab training setup, stage-1 U-Net on synthetic data, EDA. *Done; last week of the first approach.*
+4. **10–16.11:** **Pivot.** Spike, tracer v1 and v2, model comparisons, .dd2vtt writer, first Roll20 import from a traced map, app plan, spec and constitution, docs rewritten.
+5. **17–23.11:** The app: two profiles, app logic, Gradio page, failure handling, map size worked out by the model. **Milestone: a file downloaded from the app imports into Roll20.**
+6. **24–30.11:** Full evaluation run on the real maps (all four predictors), map-size accuracy, Roll20 fix times. Finalize the test set.
+7. **1–7.12:** App polish from the evaluation's findings, request log, demo setup. **Feature freeze 07.12.**
+8. **8–14.12:** Test set run (once), error analysis, failure gallery, system card. Workshop session 14.12 for feedback.
 9. **15–23.12:** Slides, demo video, rehearsal. **Final presentation 23.12.**
 
 ## Risks & mitigations
 
 | Risk | Likelihood | Mitigation |
 | --- | --- | --- |
-| Synthetic maps look too different from real ones; model doesn't transfer | Medium | Heavy augmentation; fine-tune on the real maps; report the synthetic-vs-real ablation either way |
-| Vectorization produces broken or jagged walls | High | Start it in week 4, not week 7; snap to axes; tune on validation maps |
-| Doors and windows indistinguishable in the export | Medium | Decided: one portal class only |
-| Lights too rare or too varied to learn well; tier read wrong | Medium | Biased crops and class weights; tier from blob size, values editable in the app; lights are cut first if time runs short, walls and portals are never cut for them |
-| Roll20 reads .dd2vtt light fields differently than expected | Medium | Checked by hand in week 2 with one light per tier, before any light code is written |
-| Not enough real maps | Medium | Dungeon Alchemist maps are fast to make; rely more on synthetic data; 10 layouts × 3 variants is still usable |
-| Dungeon Alchemist exports differ from the pilot (new light assets, other wall data) | Low | Unknown light assets stop the conversion until a rule is added; every export is checked in the rasterizer preview |
-| Grid detection fails on gridless maps | High | User-entered size is the default fallback, not an error |
-| Colab session limits or disconnects interrupt a run; compute units run out | Medium | Resumable `last.pt` every epoch, runs written straight to Drive; the fixed run list keeps GPU use small; CPU training overnight as a fallback |
-| Time pressure in December (deployment and write-up compete) | Medium | Feature freeze on 07.12; the last two weeks are polish and writing only |
-| Course requirements differ from assumptions | Low | Pretrained models confirmed allowed; solo confirmed; submission confirmed (presentation, demo, repo) |
+| API cost grows past what the project can spend | Medium | Cost shown per pass; a cost limit per map in the config; paid runs larger than a few maps approved one by one; tests use a fake client |
+| The live demo depends on the network and the provider | Medium | A recorded demo video as backup; a finished mask stays downloadable when a later pass fails |
+| Caves and complex structures are traced badly | High | The deep pass; the note next to its button; reported honestly |
+| Results rest on one run per map; scores vary between runs | High | The full evaluation covers 34 maps; repeat runs on the reference maps before calling a change better or worse |
+| The model gets the map size wrong, shifting every wall | Medium | The size stays editable and a typed size wins; correcting it costs nothing; accuracy is measured |
+| The model refuses, or a usage or rate limit stops a pass | Low | Plain-language message; the earlier mask stays; a fallback model for declined requests is set in the config |
+| A model is changed or retired by the provider before 23.12 | Low | Model names and prices live in one config file; the reference maps re-score any replacement |
+| Roll20 reads the file differently than expected | Low | Proven on 13.11 with a traced tavern map; checked again from the app in week 5 |
+| The comparison looks unfair to the trained model | Medium | Say plainly that stage 2 was never run; show the stage-1 numbers as they are |
+| Time pressure in December | Medium | Feature freeze on 07.12; the last two weeks are analysis and writing only |
 
 ## Deliverables & open questions
 
 **Deliverables for 23.12:**
 
-- [ ] GitHub repo: generator, rasterizer, training, evaluation, post-processing, app
-- [ ] Saved datasets (images, .dd2vtt, masks, manifest) + trained model weights + model card (data, metrics, limitations)
-- [ ] Live demo URL
-- [ ] Training and validation report: splits, training curves, learning progression, results table, failure gallery
-- [ ] Presentation slides + a 2-minute demo video (map → .dd2vtt → Roll20 fog of war)
+- [ ] GitHub repo: tracer, writer, app, evaluation, and the first approach (generator, rasterizer, training)
+- [ ] Results: the comparison table on the real maps and the test set, costs, failure gallery, and a system card (models used, data, metrics, limitations, cost, privacy)
+- [ ] The first approach's record: saved datasets (images, .dd2vtt, masks, manifest), the stage-1 run with its curves and learning progression
+- [ ] Live demo on the laptop, with a recorded video as backup
+- [ ] Presentation slides + a 2-minute demo video (map → app → file → Roll20 fog of war)
 
-**Open questions (answer this week):**
+**Answered:**
 
-- [ ] Is fine-tuning a pretrained encoder acceptable, Answered: yes, pretrained models may be used, so the plan's pretrained encoder stays.
-- [ ] Team or solo: answered. Teams are allowed; starting solo, and the plan is scoped for one person. If a partner joins, hand them the synthetic generator or the web app.
-- [x] Final submission: answered 26.10. The presentation (up to 12 minutes), a demo and the code repo.
-- [x] Doors vs. windows: answered. Not in the .dd2vtt, so the project uses one portal class only, with no door/window split.
-- [ ] Is `.dungeondraft_map` plain JSON? Yes, but out of scope: the project uses images and .dd2vtt only.
+- [x] Pretrained models may be used (asked in week 1).
+- [x] Solo; the plan is scoped for one person.
+- [x] Final submission (26.10): the presentation (up to 12 minutes), a demo and the code repo.
+- [x] Doors vs. windows: not in the .dd2vtt, so one portal class only.
+- [x] `.dungeondraft_map` files: out of scope; images and .dd2vtt only.
+- [x] A large model in place of a trained one: allowed by the course staff (13.11).
+
+**Open:**
+
+- [ ] How many test-set maps to hand-trace.

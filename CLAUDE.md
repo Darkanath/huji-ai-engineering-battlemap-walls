@@ -1,137 +1,190 @@
-# Battlemap Auto-Walling
+# Battlemap Tracer
 
 Course project (Hebrew University, AI Engineering). Upload a top-down battlemap image and get back a
-Universal VTT file (.dd2vtt) with walls, portals and light sources placed, ready to upload to
-Roll20 for dynamic lighting and fog of war. The core is a semantic segmentation model (U-Net)
-trained in PyTorch.
+Universal VTT file (`.dd2vtt` or `.uvtt`) with walls, portals and light sources placed, ready to
+upload to Roll20 for dynamic lighting and fog of war.
 
-Full plan: `docs/PLAN.md`. Read it before starting a new piece of work. Final presentation: 2026-12-23.
-Week-by-week tasks, file names and done criteria: `docs/roadmap/week-NN.md` (index in
-`docs/roadmap/README.md`). Work from the current week's file and tick its boxes as tasks finish.
+The core is a **Claude wall tracer** (`llm/`): a large vision model reads the map image and
+answers with walls, portals and lights in grid squares. The course staff allowed a large model in
+place of a trained one on 2026-11-13, and the measurements in `docs/results.md` showed it beats
+the trained U-Net. **Model training is dropped**; `train/`, the synthetic generator and the
+Colab notebook stay in the repo untouched, as the record of the first approach and the source of
+the U-Net comparison row. No further work on them.
+
+Where to look before starting a piece of work:
+
+- `.specify/memory/constitution.md`: the project's principles. It wins over this file where they
+  disagree.
+- `specs/NNN-name/`: the spec, plan and tasks of each feature (current: `specs/001-battlemap-tracer-app/`).
+- `docs/app-plan.md`: the app plan the current spec grew from. `docs/results.md`: every measurement.
+- `docs/PLAN.md`: the project plan, rewritten around the tracer on 2026-11-13. `docs/roadmap/`:
+  week-by-week tasks (index in `docs/roadmap/README.md`); weeks 1-3 are the record of the first
+  approach. `docs/training.md` is history.
+
+Final presentation: 2026-12-23.
 
 ## Hard constraints (do not drift from these)
 
 - **Python only.** All code is Python. The only non-Python files allowed are the Dockerfile,
   docker-compose.yml, pyproject/requirements, config files (YAML/TOML) and docs. No JavaScript or
   hand-written HTML; the UI is built with Gradio.
-- **Images in.** Inference input is an image only: `.png`, `.jpg`/`.jpeg`, `.webp`.
-- **Labels come only from .dd2vtt files.** Never read or depend on `.dungeondraft_map` source files.
+- **Images in.** Input is an image only: `.png`, `.jpg`/`.jpeg`, `.webp`.
+- **Labels come only from .dd2vtt files**, and are now used for evaluation, not training. Never
+  read or depend on `.dungeondraft_map` source files.
 - **4 classes:** `0 = background`, `1 = wall`, `2 = portal` (doors and windows together; no
   door/window split, not even as a stretch goal), `3 = light` (a drawn light source: torch,
   candle, lantern, brazier, campfire, bonfire). One light class only; brightness comes from the
-  blob's **size tier** (small / medium / large) and a lookup table, never from a learned
-  regression. Lights are lower priority than walls and portals: if time runs short, they are cut
-  first.
-- **Training runs on Google Colab (GPU); everything else runs locally on CPU.** Data
-  generation, the manifest, tests, evaluation, ONNX export, inference and the app run on the
-  laptop (Intel CPU, no NVIDIA GPU). Model training (`train.train`) runs on a Colab GPU through
-  `notebooks/colab_train.ipynb`, with data and runs on Google Drive. The Docker image keeps the
-  **CPU-only PyTorch build**: never add CUDA dependencies to it. Training code picks its device in
-  one place (`train/model.py`): CUDA if available, else XPU if `torch.xpu.is_available()`, else
-  CPU, always via `.to(device)`, never `.cuda()`. Training must still run on the CPU (slowly), as
-  a fallback and for the tests.
-- **Runs on the laptop under Docker** (all but training), Ubuntu 24.04 base image, started with
-  Docker Compose.
-- **Every dataset is saved to disk** (never generated on the fly during training) so it can be
-  showcased: image, .dd2vtt and mask per map, a fixed seed per map, and a manifest CSV.
-- **Pretrained models are allowed.** Default model: U-Net with a pretrained ResNet-18 encoder
-  (`segmentation_models_pytorch`).
+  light's **size tier** (small / medium / large) and a lookup table, never from a per-light
+  estimate.
+- **Runs on the laptop under Docker** (Intel CPU, no NVIDIA GPU), Ubuntu 24.04 base image, started
+  with Docker Compose. The image keeps the **CPU-only PyTorch build**: never add CUDA dependencies.
+- **Paid model calls are visible and approved.**
+  - The app shows each paid action's expected time and cost before the click, and the actual
+    time and estimated cost after it.
+  - The app says that uploaded images are sent to a third-party model provider.
+  - Input is validated (type, size, map size) before any paid call.
+  - Tests never make paid calls; they use the fake client in `tests/conftest.py`.
+  - **Ask before a paid run larger than a few maps**, and state its estimated cost.
+- **The API key lives in `.env`** (`ANTHROPIC_API_KEY`, gitignored, read by Docker Compose). Never
+  commit, log or display it; the app never asks the user for it.
+- **Grid detection is in scope, and the model does it.** As part of a pass the user started,
+  the vision model works out the map's size in squares and the app fills it in; the user can
+  always change it, and a typed size wins. There is no local grid detector and no separate or
+  automatic paid call for it. If no grid is found, the pass uses the size in the fields and says
+  so.
+- **Local first.** Everything runs on the laptop; the only thing that leaves it is the model call,
+  made with the owner's API key. Cloud deployment is optional and not to be started until
+  everything works locally and the owner asks for it.
+- **No more real maps.** The maps not yet made (`dd09`-`dd13`, `da02`-`da06`) are dropped; a new
+  map is made only if testing needs one.
 - Solo project. Keep the scope at what one person can finish by 2026-12-23.
 
 ## Stack
 
 - Python 3.12 (Ubuntu 24.04 default), in a virtual environment inside the container (PEP 668).
-- PyTorch + torchvision CPU wheels: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu`
-  (Docker image). On Colab, use the preinstalled CUDA PyTorch and install only the project's
-  other packages.
-- `segmentation_models_pytorch`, `albumentations`, `opencv-python-headless`, `scikit-image`,
-  `numpy`, `Pillow`, `shapely` (visibility polygons), `onnxruntime` (serving), `gradio` (UI),
-  `fastapi` + `uvicorn` (optional API), `mlflow` (run tracking), `pytest`, `ruff`.
+- In use: `anthropic` (Claude API), `gradio` (UI), `pydantic` v2 (domain models and config),
+  `numpy`, `Pillow`, `opencv-python-headless`, `pytest`, `ruff`. From the first approach, still
+  installed: PyTorch + torchvision CPU wheels, `segmentation_models_pytorch`, `albumentations`,
+  `mlflow`.
+- Dependencies are managed with `uv`: declared in `pyproject.toml` (PyTorch from the CPU wheel
+  index through `[tool.uv.sources]`), locked in `uv.lock`, installed with `uv sync --frozen` in
+  the Dockerfile. After changing one, run `uv lock` and rebuild the image.
+- Agreed but not yet installed: `shapely` (visibility IoU, a stretch metric).
+  Add a package only in the change that first uses it, and ask before adding anything not
+  listed here.
+
+## Models
+
+Two profiles in `llm/configs/claude.toml`, measured on the reference maps with the v2 harness
+and the map-size step (one to three runs per map; `docs/results.md`, 13.11):
+
+| Profile | Model | Time per map | Cost per map | Wall boundary F1, castle / mine |
+| --- | --- | --- | --- | --- |
+| `quick` (default, "Suggest walls") | `claude-sonnet-5-5`, medium effort | about 25 s | about $0.10 | 0.91–0.97 / 0.55–0.66 |
+| `deep` ("Deeper examination") | `claude-opus-5-5`, medium effort | about 70 s | about $0.32 | 0.99 / 0.88–0.89 |
+
+- The fast pass is good on buildings and weak on caves and doors; the deep pass fixes most of that.
+- `claude-fable-5-2` is the most accurate and the most expensive; it stays available through
+  `--model` for comparisons.
+- Model names, effort, limits and prices live in the config, never in code.
+- The config has `[profiles.quick]` and `[profiles.deep]` (model, effort, deadline, expected
+  time and cost shown on the buttons), `[lights.*]` and `[app]`; `app/config.py` validates it.
+  `[size_step]` names the profile whose model works out the map size: `deep` (Opus) in both
+  passes, because Sonnet got it right on 1 of 3 grid maps and Opus on 3 of 3. Re-measure with
+  `python -m llm.run --reference --detect-size` (paid, ask first).
 
 ## Repo layout
 
 ```
-data/            generator.py + synth/ (synthetic maps), rasterize.py (.dd2vtt -> mask), manifest.py,
-                 retier_lights.py + configs/light_sources.toml (Dungeon Alchemist lights -> tiers)
+llm/             Claude wall tracer: agent.py (tool loop, trace_map), views.py (grid views and
+                 answer overlay), run.py (batch runs and scoring), configs/claude.toml
+postprocess/     uvtt.py: the tracer's answer -> .dd2vtt / .uvtt (answer_to_uvtt, write_uvtt)
+app/             Gradio app: service.py (logic, testable), main.py (UI wiring only),
+                 tracer.py (run_pass: the only model call), exporter.py, render.py, domain.py
+                 (Pydantic models, fractions <-> grid squares), config.py, errors.py, logging.py
+eval/            metrics (pixel IoU, boundary F1), Canny baseline, evaluate.py
+data/            rasterize.py (.dd2vtt -> mask, LIGHT_TIERS), manifest.py, retier_lights.py +
+                 configs/light_sources.toml (Dungeon Alchemist lights -> tiers); generator.py +
+                 synth/ (synthetic maps, first approach)
   raw/           source .dd2vtt files (dungeondraft/, dungeon_alchemist/, synthetic/, test/)
-                 [gitignored]; Dungeon Alchemist exports keep their originals in original/ and
-                 get their lights mapped to tiers by retier_lights.py
+                 [gitignored]; Dungeon Alchemist exports keep their originals in original/
   processed/     image + mask pairs, manifest.csv                          [gitignored]
-train/           dataset, augmentations, training loop, configs/
-eval/            metrics (pixel IoU, boundary F1, visibility IoU), baseline (Canny), reports
-postprocess/     mask -> polylines -> portals -> lights -> .dd2vtt writer
-app/             Gradio app (upload, overlay preview, download .dd2vtt)
-notebooks/       exploration and figures for the presentation
-docs/            PLAN.md, labeling rules, training plan, map specs and log, roadmap, results
-runs/            checkpoints and MLflow logs                               [gitignored]
+  reference/     dd04_a, dd06_a, dd07_a, dd04_d: the tracer's reference maps   [committed]
+  test/          published third-party maps, test only                     [never committed]
+train/           U-Net training code, first approach                       [frozen]
+notebooks/       eda.ipynb; colab_train.ipynb                              [frozen]
+specs/           feature specs, plans and tasks (Spec Kit)
+docs/            app-plan.md, results.md, PLAN.md, labeling rules, map specs and log, roadmap
+runs/            run outputs, answers, previews, scores                    [gitignored]
 tests/           pytest
 ```
 
-Datasets, checkpoints and logs are mounted as Docker volumes so they persist on the host.
+Datasets and runs are mounted as Docker volumes so they persist on the host.
 
-## Universal VTT (.dd2vtt) facts
+## Universal VTT (.dd2vtt / .uvtt) facts
 
-- One JSON file. All coordinates are in **grid squares**, not pixels.
+- One JSON file; `.dd2vtt` and `.uvtt` are the same content under two extensions. All coordinates
+  are in **grid squares**, not pixels.
 - `resolution.pixels_per_grid`, `resolution.map_origin`, `resolution.map_size`. Use **70 px per
-  square**, Roll20's default: export Dungeondraft maps with the Roll20 grid preset (much smaller
-  files than Dungeondraft's default 256), and write the output .dd2vtt image at 70 px per square so
-  Roll20 places it at native scale. Code must still read any `pixels_per_grid` value.
+  square**, Roll20's default: export Dungeondraft maps with the Roll20 grid preset, and write the
+  output image at 70 px per square so Roll20 places it at native scale. Code must still read any
+  `pixels_per_grid` value.
 - `line_of_sight`: list of polylines (lists of `{x, y}`); these are the walls.
 - `objects_line_of_sight`: extra sight blockers; treat as walls.
 - `portals`: each has `position`, `bounds` (2 endpoints), `rotation`, `closed`, `freestanding`.
   No door/window type.
 - `lights`: each has `position`, `range` (grid squares), `intensity`, `color`, `shadows`. Labels
-  read `position` and map `range` to a size tier; the output writes one light per detected blob,
-  with `range` and `intensity` from the tier table (`postprocess/configs/lights.toml`). Label
-  tiers (range -> disc radius) are `LIGHT_TIERS` in `data/rasterize.py`.
-- `image`: base64-encoded PNG of the map. **This embedded image is the source of truth** for
-  training. A same-named `.png` next to a `.dd2vtt` in `data/raw/` is optional: use it only for
+  read `position` and map `range` to a size tier; the output writes one light per detected light,
+  with `range` from the tier table (`LIGHT_TIERS` in `data/rasterize.py`: small 8, medium 12,
+  large 16 squares).
+- `image`: base64-encoded image of the map. **In a label file, this embedded image is the source
+  of truth.** A same-named `.png` next to a `.dd2vtt` in `data/raw/` is optional: use it only for
   viewing, and if code reads it, first check its size matches `map_size` x `pixels_per_grid`.
-- Roll20 accepts .dd2vtt directly via Page Menu -> Upload Background.
+- Roll20 accepts the file directly via Page Menu -> Upload Background.
 
 ## Pipeline conventions
 
-- **Default map size: 25x25 squares** (1750x1750 px at 70 px per square). The synthetic generator
-  and new real maps use it by default, and the app pre-fills it as the map size the user
-  can change. Code must still accept any map size.
-
-- **Scale normalization:** datasets are stored at 70 px per square; training and inference run at
-  **32 px per square** (walls about 8 px thick). Inference rescales the upload using the detected
-  grid, or a user-entered map width in squares as fallback.
-- **Storage formats:** map images and previews are saved as JPEG (quality 90; the demo map is
-  0.63 MB vs 1.68 MB as PNG). Masks are **always PNG**: JPEG is lossy and would corrupt class ids.
-- Training: random 256x256 crops, ~2,000 crops per epoch, cross-entropy + Dice with class weights
-  computed from the training split's pixel shares (wall share varies with wall thickness; demo
-  map: walls 7.4%, portals 0.6%). Stage 1 synthetic, stage 2 fine-tune on the real maps.
+- **Tracing:** the model gets the whole map plus its four quarters at higher zoom up front, each
+  with a labeled square grid; it can ask for closer crops; it submits walls (polylines and arcs),
+  portals and lights in grid squares, and sees its answer drawn over the map before it finishes.
+  Limits per map (turns, views, submissions, cost) are in the config.
+- **Default map size: 25x25 squares** (1750x1750 px at 70 px per square). The app pre-fills it,
+  replaces it with the size the model works out during a pass, and the user can change it. Code
+  must accept any map size.
+- **Changing the map size** after a suggestion keeps the mask over the same image features; it
+  does not run a pass.
+- **Evaluation:** answers are rasterized with `data/rasterize.py` and scored with
+  `eval/metrics.py` at **32 px per square** (boundary F1 tolerance 0.1 square), the same way for
+  every predictor: Canny, the frozen stage-1 U-Net, each Claude profile. Results go in
+  `docs/results.md` with the run name, cost and sample size.
+- **Storage formats:** map images and previews are JPEG (quality 90). Masks are **always PNG**:
+  JPEG is lossy and would corrupt class ids.
 - **Real maps** = Dungeondraft (`ddNN`) + Dungeon Alchemist (`daNN`), both made by the user and
-  labeled from their export. Each tool is its own dataset, split by layout separately; they are
-  pooled for stage 2 training, validation and checkpoint selection. Dungeon Alchemist exports
-  are Orthographic (Top Down) at 72 DPI; their originals stay in
-  `data/raw/dungeon_alchemist/original/`, and their lights are mapped to tiers by
-  `data/retier_lights.py` before rasterizing.
-- Splits are **by map, never by crop**; all style exports of one layout (`dd01_a`..`dd01_d`,
-  `da01_a`..`da01_d`) stay in the same split. The test set is run once, at the end.
-- Post-processing: close small gaps with a kernel well under 0.25 square (doorless openings must
-  stay open), skeletonize, trace, Douglas-Peucker, cut walls where portals cross, convert to grid
-  units, write .dd2vtt.
+  labeled from their export. All style exports of one layout (`dd01_a`..`dd01_d`) stay in the
+  same split. The test set is run once, at the end.
 - Labeling rules: wall = blocks sight and movement (building walls, palisades, cave walls,
   cliffs). Portal = door or window in a wall. An open gap with no door is just a gap. Furniture,
   counters, rugs, trees, boulders and water are not walls. Light = a lit light source drawn in the
   image; its tier is set by its `range` in the .dd2vtt (see `docs/labeling-rules.md`).
-- Lights in the mask: a disc at the light's `position`, radius by tier (0.25 / 0.40 / 0.60
+- Lights in a label mask: a disc at the light's `position`, radius by tier (0.25 / 0.40 / 0.60
   squares), drawn **under** walls and portals so a wall-mounted torch never cuts a gap in a wall.
-  Post-processing: light blob -> centroid (position) + area (tier) -> range from the tier table.
-- Data licensing: train only on synthetic maps and maps the user made (Dungeondraft, Dungeon
-  Alchemist). Published third-party maps
-  go in the test set only and are never redistributed.
+- Data licensing: published third-party maps go in the test set only and are never redistributed
+  or committed.
 
 ## Working conventions
 
-- Type hints, small functions, docstrings on public functions. Format and lint with `ruff`.
+- Type hints, small functions. **Docstrings on everything**: modules, package `__init__.py`
+  files, every function including tests, fixtures and nested helpers; comments in the Dockerfile
+  and compose file. The code is part of the graded deliverable.
+- Format and lint with `ruff`.
 - Every module that transforms data gets a pytest test, using the demo map in `data/raw/dungeondraft/`.
-- Seed everything (`random`, `numpy`, `torch`) from config; log every run to MLflow with its config.
-- Run everything through Docker Compose, e.g. `docker compose run --rm app pytest`.
-- On CPU, set `torch.set_num_threads()` to the physical core count; use channels-last memory format.
-- Training writes a resumable `last.pt` every epoch (Colab sessions disconnect) and logs the
-  device and GPU name with each run.
+- App logic lives in plain functions apart from the UI, so tests can call it; no test drives the
+  browser.
+- A failed model call (refusal, limit, missing key, network, timeout, unreadable response) reaches
+  the user as a plain-language message, never a crash or a stack trace, and has a test.
+- Seed everything that is random from config; record each scored run's config with its results.
+- Run everything through Docker Compose, e.g. `docker compose run --rm app pytest`. The app:
+  `docker compose run --rm --service-ports app python -m app.main`, served on port 7860.
+- Commit only when asked; small commits by topic. Decisions committed in earlier sessions win
+  over later edits made by other tools.
 - Prefer simple, working, measured solutions over clever ones. Ask before adding a new dependency.

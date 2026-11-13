@@ -16,3 +16,6 @@ work as well as what did).
 | 26.10 | R1 real-val boundary F1 plateaus (~0.84) while the training loss keeps falling | Synthetic-to-real gap; stage 2 fine-tuning on real maps. More real val layouts needed: one layout makes the best-epoch choice noisy |
 | 26.10 | R1 predicts a few light specks on light-free `dd03` (light IoU 0) | Minimum blob size in light post-processing (week 6) |
 | 26.10 | Colab EDA: `No module named 'data.rasterize'`. The pack was unzipped to `/content/data/`, and with `/content` as the working folder `import data` found that folder (a namespace package) instead of the project's `data` package | Both notebooks unzip to `/content/pack`; the EDA notebook also imports the project from its clone |
+| 13.11 | A spike showed Claude tracing walls, portals and lights straight from the image, far ahead of the stage-1 U-Net on two real maps (boundary F1 0.995 / 0.957 vs 0.664 / 0.118), after the course staff allowed a large model | Training dropped; the Claude tracer became the core, the U-Net a comparison row |
+| 13.11 | Tracer v1: left to choose when to zoom in, Sonnet and Haiku barely looked and missed the cave walls; Opus missed tower doors | v2 sends the four map quarters up front; every model improved |
+| 13.11 | Higher effort did not beat medium on the two maps tried | Both profiles run at medium effort |

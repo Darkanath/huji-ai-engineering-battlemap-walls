@@ -1,5 +1,10 @@
 # Training plan
 
+> **History (13.11.2026).** Training stopped after run R1 (stage 1, synthetic only), when the
+> course staff allowed a large model in place of a trained one and the Claude tracer replaced
+> the U-Net ([PLAN.md](PLAN.md), "First approach"). Stage 2 and the ablations below were never
+> run. This page is kept as the record of how the first approach was meant to be trained.
+
 How every model in this project is trained, validated and selected. The week-by-week tasks are in
 [roadmap/](roadmap/README.md) (weeks 3–6). The reasons behind the overall approach are in
 [PLAN.md](PLAN.md). Numbers marked *(estimate)* get measured in week 3 and updated here.

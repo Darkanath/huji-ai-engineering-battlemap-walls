@@ -1,55 +1,57 @@
-# Week 6 · 24–30.11 · Ablations, grid detection, final test set
+# Week 6 · 24–30.11 · Full evaluation run on the real maps, final test set
 
-**Goal:** the planned ablation runs done, the scale found from the image when a grid is visible,
-lights turned from mask blobs into .dd2vtt lights, and the test set frozen.
+**Goal:** the comparison table on all 34 real maps (Canny, the stage-1 U-Net, both tracer
+profiles), map-size accuracy measured, and the test set frozen.
 
 ## You
 
-- [ ] Finalize the test set: 10–15 maps, split into **in-domain** (Dungeondraft-like or Dungeon
-      Alchemist-like) and **hard** (outdoor, photoreal). Record which is which in
-      `data/raw/test/test_maps.csv` and `docs/map-log.md`.
-- [ ] Run the ablations on Colab (`notebooks/colab_train.ipynb`), one config each; copy each
-      `runs/<run>/` back to the laptop.
+- [ ] **Approve the full evaluation run before it starts:** all 34 real maps with both
+      profiles, about $2.50 on Sonnet plus $9 on Opus.
+- [ ] Time the manual Roll20 fixes on 2–3 traced maps (a building and a cave), for the "Fix
+      time" column in `docs/results.md`.
+- [ ] Finalize the test set: published maps, split into **in-domain** (Dungeondraft-like or
+      Dungeon Alchemist-like) and **hard** (outdoor, photoreal). Trace them in Dungeondraft
+      following "Hand-tracing the test set" in the labeling rules, swap the original image in
+      with `data/attach_image.py`, and record them in `data/raw/test/test_maps.csv` and
+      `docs/map-log.md`. Third-party maps never leave `data/raw/test/`.
 
 ## Code
 
 | File | What |
 | --- | --- |
-| `train/configs/ablation_real_only.toml` | U-Net trained on the real maps only (Dungeondraft + Dungeon Alchemist). |
-| `train/configs/ablation_synthetic_only.toml` | Stage 1 model, no fine-tuning (reuses the week 3 run if its config matches). |
-| `train/configs/ablation_no_scale_norm.toml` | Same as the main run but without rescaling to 32 px per square. |
-| `train/configs/ablation_mobilenet.toml` *(stretch)* | MobileNetV3 encoder: accuracy vs CPU speed. |
-| `data/grid.py` | Detect a visible square grid (line periodicity in the image) and return px per square, or `None`; the pipeline then falls back to the user's map width. |
-| `tests/test_grid.py` | Finds the grid on the demo map (70 px); returns `None` on a map exported without a grid. |
-| `eval/report.py` | Collect MLflow runs into the results table and the training-curve figures for the slides. |
-| `postprocess/lights.py` *(lights)* | Light blobs (drop ones under a minimum area) -> centroid = position, equivalent radius -> nearest tier (thresholds halfway between the label radii) -> `range` and `intensity` from the tier table. Wired into `app/pipeline.py` and the writer. |
-| `postprocess/configs/lights.toml` *(lights)* | The output tier table: bright and dim, `range`, `intensity` per tier (label radii and tier ranges stay in `LIGHT_TIERS`, `data/rasterize.py`). Must match `docs/labeling-rules.md`. |
-| `eval/metrics.py` *(lights)* | Light F1 (one-to-one match within 0.5 squares) and tier accuracy on matched lights; added to `eval/evaluate.py`. |
-| `tests/test_lights.py` *(lights)* | Round trip on a hand-made map: rasterize -> `lights.py` returns the same positions (within 0.1 square) and tiers; a light disc cut by a wall still gives one light; light F1 is 1 for a perfect prediction and 0 for none. |
-
-About 6 training runs in total: stage 1, stage 2, real-only, no scale normalization, MobileNet,
-plus Canny. Decide the list now and do not add to it.
+| `eval/baseline_canny.py` | Retune once on the real maps (`--retune`), then leave it frozen. |
+| `llm/run.py` | Run a whole split or dataset; record per map the scores, the cost, the time, and whether the model's map size matched the true one. Resume a run that stopped partway without paying twice. |
+| `eval/report.py` | Collect the runs into the results table: per predictor, development maps (`dd06`, `dd07`) apart from the rest, buildings apart from caves. |
+| `tests/test_report.py` | The table is built from saved per-map scores; a map missing from one run is reported, not silently dropped. |
+| `eval/visibility.py`, `tests/test_visibility.py` *(stretch)* | Visibility IoU: ~100 seeded viewpoints per map, visibility polygon with predicted and with true walls. |
+| `eval/metrics.py` *(stretch)* | Light F1 (match within 0.5 squares) and tier accuracy. |
 
 ## Run
 
 ```bash
-# On Colab: notebooks/colab_train.ipynb with train/configs/ablation_real_only.toml (and the others)
-docker compose run --rm app python -m eval.report --split val
+docker compose run --rm app python -m eval.baseline_canny --retune
+docker compose run --rm app python -m eval.evaluate --predictor canny --split all
+docker compose run --rm app python -m eval.evaluate --predictor unet --checkpoint runs/r1_stage1_synthetic/best.pt --split all
+docker compose run --rm app python -m llm.run --profile quick --run eval_quick    # after approval
+docker compose run --rm app python -m llm.run --profile deep --run eval_deep      # after approval
+docker compose run --rm app python -m eval.report
 ```
+
+The exact flags are settled when the code is written; the commands above show the intent.
 
 ## Done when
 
-- [ ] All planned ablation runs finished and scored on validation.
-- [ ] Grid detection works on grid maps and falls back cleanly on gridless ones.
-- [ ] Test set frozen: 10–15 maps, in-domain and hard, all traced and checked.
-- [ ] Final model chosen by validation boundary F1. **No test-set runs yet.**
-- [ ] *(lights)* Light F1 and tier accuracy on validation for the chosen model; the predicted
-      lights of one validation map import into Roll20.
+- [ ] All four predictors scored on the 34 real maps; table in `docs/results.md` with cost,
+      time and the number of runs per cell.
+- [ ] Map-size accuracy measured; SC-009's 80% target in the spec confirmed or revised.
+- [ ] The reference-map thresholds in the spec (SC-003, SC-004) checked against repeat runs.
+- [ ] Test set frozen and traced. **No test-set runs yet.**
+- [ ] All tests pass.
 
 ## Report
 
-- Ablation table on validation (real-only vs synthetic-only vs synthetic -> real; with vs without scale normalization), with light F1 and tier accuracy columns.
+- The comparison table and the cost per map; first Roll20 fix times.
 
 ## Dependencies
 
-None new.
+- `shapely` only if visibility IoU is built (agreed in CLAUDE.md as a stretch).

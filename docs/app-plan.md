@@ -116,7 +116,8 @@ One commit for the pipeline built today (`llm/`, `postprocess/uvtt.py`, tests, c
 published third-party map) stays out of git.
 
 ## Out of scope for this plan
-- Grid auto-detection (the user types the map size).
+- (Grid auto-detection was out of scope here; it was brought into scope on 2026-11-13, done by the
+  model as part of a pass; see `specs/001-battlemap-tracer-app/spec.md`.)
 - Editing the mask by hand in the app.
 - The full evaluation on all 34 real maps (about $2.50 on Sonnet plus $9 on Opus): a separate
   paid run, to be approved on its own.

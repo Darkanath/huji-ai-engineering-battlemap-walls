@@ -1,53 +1,63 @@
-# Week 4 · 10–16.11 · Dungeon Alchemist maps, fine-tune on real maps; mask -> .dd2vtt
+# Week 4 · 10–16.11 · Pivot: Claude tracer, model comparisons, spec and plan
 
-**Goal:** the real-map set finished, the stage 2 model fine-tuned on it (Dungeondraft and Dungeon
-Alchemist maps), and the post-processing that turns a predicted mask into a .dd2vtt. This is about half the engineering work, so it starts now.
+**Goal:** decide whether a large model can replace the trained one, and if so turn it into a
+pipeline and a plan for the app.
+
+This week was planned as "Dungeon Alchemist maps, fine-tune on real maps, mask -> .dd2vtt". On
+13.11 the course staff allowed a large model in place of a trained one, and the week became the
+pivot. The stage 2 fine-tuning run, the `da02`–`da06` maps and the mask-to-polyline
+post-processing were dropped.
 
 ## You
 
-- [ ] **Before the stage 2 run:** 5 Dungeon Alchemist layouts × 4 variants, `da02`–`da06`, as
-      specified in [map-specs.md](../map-specs.md). Save exports to
-      `data/raw/dungeon_alchemist/original/`, convert their lights with `data.retier_lights`
-      (add a rule for any new light asset), check each preview, and log them in
-      [map-log.md](../map-log.md). That makes 19 real layouts in total.
-- [ ] Rebuild the manifest, so the new maps get their splits.
-- [ ] Retune the Canny baseline once on the complete real val split
-      (`python -m eval.baseline_canny --retune`), then leave it frozen.
-- [ ] Keep tracing test-set maps.
+- [x] Ask the course staff whether a large model may replace the trained one. *Allowed, 13.11.*
+- [x] Import a traced map into Roll20. *13.11: `data/test/map-26x28.jpeg`, fog of war works;
+      one mistake, an extra door inside the bathroom.*
+- [ ] Read and approve the spec and the constitution
+      (`specs/001-battlemap-tracer-app/spec.md`, `.specify/memory/constitution.md`).
+- [x] No more real maps, except if testing needs one; cloud deployment optional, local first.
+      *Decided 13.11.*
+- [ ] Decide how many test-set maps to trace (PLAN.md, open questions).
 
 ## Code
 
 | File | What |
 | --- | --- |
-| `train/configs/stage2_real.toml` | Stage 2: start from the stage 1 checkpoint, real train split (Dungeondraft + Dungeon Alchemist), lower learning rate. |
-| `train/predict.py` | Sliding-window inference: 256 windows with overlap, probabilities averaged at the seams; returns a class mask at the input's scale. |
-| `postprocess/clean.py` | Morphological close with a kernel well under 0.25 square (doorless gaps stay open); drop blobs under a minimum area. |
-| `postprocess/vectorize.py` | Skeletonize walls, trace the skeleton into polylines (graph walk from endpoints and junctions), simplify with Douglas–Peucker, optional snapping to horizontal and vertical. |
-| `postprocess/portals.py` | Each portal blob -> principal axis -> one segment; cut wall polylines where a portal crosses them. |
-| `postprocess/writer.py` | Write the .dd2vtt: `format`, `resolution` (70 px per square), `line_of_sight`, `portals`, `lights` (takes a list; empty until `postprocess/lights.py` exists in week 6), base64 PNG image. Pixel -> grid units, undoing the scale normalization. |
-| `tests/test_postprocess.py` | **Round trip:** rasterize the demo map's .dd2vtt -> vectorize -> write -> rasterize again; the masks match closely (wall IoU > 0.9) and the portal count is the same. A doorless gap stays open after cleaning. |
-| `tests/test_writer.py` | Output loads with `load_uvtt`; coordinates are in grid units; given lights are written with grid-unit positions and their `range`; no lights gives an empty list. |
-
-The skeleton tracer is written by hand, so `skan` is not needed.
+| `llm/agent.py` *(done)* | The tool loop: `trace_map(image, map_size, cfg, client, views_dir)` sends the views, lets the model ask for crops, takes its answer, shows it back on an overlay, and returns a `Trace` (answer, cost, time, closing note). Limits per map from the config. |
+| `llm/views.py` *(done)* | `render_view`: a map region with a labeled square grid, optionally with an answer drawn over it. |
+| `llm/run.py` *(done)* | Batch runs and scoring: `python -m llm.run --maps ... --run NAME --model MODEL --effort EFFORT`. |
+| `llm/configs/claude.toml` *(done)* | Model, effort, limits, views (quarters up front) and prices. |
+| `postprocess/uvtt.py` *(done)* | `answer_to_uvtt`, `write_uvtt`: the tracer's answer -> .dd2vtt; arcs become polylines; light `range` from the tier table. |
+| `tests/test_llm_agent.py`, `tests/test_llm_views.py`, `tests/test_uvtt_writer.py` *(done)* | The loop with a fake client, the views, and the writer. |
+| `docs/results.md` *(done)* | The spike, tracer v1 (four models) and tracer v2 (quarters up front). |
+| `docs/app-plan.md` *(done)* | The app plan: Sonnet draft, Opus deep pass, accept and download. |
+| `specs/001-battlemap-tracer-app/spec.md` *(done)* | The feature spec, including map size worked out by the model. |
+| `.specify/memory/constitution.md` *(done)* | Project principles. |
+| `CLAUDE.md`, `docs/PLAN.md`, `README.md`, `docs/roadmap/` *(done)* | Rewritten around the tracer. |
+| `specs/001-battlemap-tracer-app/plan.md`, `tasks.md` | The implementation plan and task list (`/speckit-plan`, `/speckit-tasks`). |
 
 ## Run
 
 ```bash
-docker compose run --rm app python -m data.manifest && docker compose run --rm app python -m data.pack
-# On Colab: notebooks/colab_train.ipynb with train/configs/stage2_real.toml (new pack uploaded first)
-docker compose run --rm app pytest tests/test_postprocess.py -v
+docker compose run --rm app pytest
+docker compose run --rm app python -m llm.run --maps dd07_a dd06_a --run NAME --model MODEL --effort medium
 ```
 
 ## Done when
 
-- [ ] Stage 2 run finished; real validation scores (pooled and per tool) logged next to stage 1 and Canny.
-- [ ] Round-trip test passes on the demo map and on every real validation map.
-- [ ] All tests pass.
+- [x] The tracer beats the stage-1 U-Net and Canny on the two reference maps. *(v2, wall
+      boundary F1: Opus 0.989 / 0.881, Sonnet 0.960 / 0.664; U-Net 0.664 / 0.118; Canny 0.058 /
+      0.133.)*
+- [x] A traced map imports into Roll20.
+- [x] Spec and constitution written; docs rewritten.
+- [ ] Plan and tasks written for the app.
+- [ ] The week's work committed (pipeline committed 13.11; spec, constitution and docs not yet).
 
 ## Report
 
-- Training curves for stage 2 (fine-tuning), with the chosen checkpoint marked.
+- The pivot story: spike, v1, v2, with the comparison tables and what each step cost
+  (about $3 in all).
 
 ## Dependencies
 
-None new: scikit-image and opencv-python-headless are already in from week 2.
+- `anthropic` (approved 13.11).

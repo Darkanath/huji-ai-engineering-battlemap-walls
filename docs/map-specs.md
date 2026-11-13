@@ -1,5 +1,9 @@
 # Map specifications
 
+> **Note (13.11.2026).** No more real maps are needed: the maps not yet made (`dd09`–`dd13`,
+> `da02`–`da06`) were for training, which was dropped. A new map is made only if testing needs
+> one. The specs below are kept as the record and for that case.
+
 What to build for the real-map datasets: 10 new Dungeondraft layouts (`dd04`–`dd13`) and 5 new
 Dungeon Alchemist layouts (`da02`–`da06`), each exported as 4 variants, so 60 exports. With
 `dd01`–`dd03` and the pilot `da01` that makes 19 layouts, inside the plan's 15–20. The rules for
