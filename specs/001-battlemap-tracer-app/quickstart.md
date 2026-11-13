@@ -139,7 +139,7 @@ fields were lost in the output).
 | B. Deeper examination | Pass. Mask replaced; Opus 5.5 (medium), 53 s, about $0.25, 24 walls, 11 portals, 2 lights; preview shows walls, doors and both chandeliers in place |
 | C.1 No key | Pass: "No API key is set up…", no stack trace, progress shown first |
 | C.2 No network (container with no network, real key) | Pass: "Couldn't reach the AI provider…" |
-| C.3 `.gif`, file over 20 MB | Refused before the app's handler, by Gradio itself, with its own wording ("Invalid file type. Please upload a file that is one of these formats: …"; the size limit). Nothing is sent to the model. The texts in contracts/ui.md appear only for files that pass Gradio's check (e.g. a text file renamed `.png`: tested) |
+| C.3 `.gif`, file over 20 MB | First run: both refused by Gradio itself, with its own wording, before the app's handler; nothing sent to the model. Fixed the same day: Gradio's type filter was dropped, and a `.gif` now gets "That file type isn't supported. Upload a PNG, JPEG or WebP image." (re-checked). Over 20 MB is still refused by Gradio's server limit first, on purpose (see contracts/ui.md) |
 | C.4 Size 0 or 201 | Pass: range message; a pass click with 0 starts nothing |
 | D. Map size from the image | `map-26x28.jpeg` (no grid lines drawn): "No grid was found…", traced on 25 x 25, option stays on. Correct for that image, but it is not a gridded map; detection on gridded maps is measured in docs/results.md (Opus 4 of 4). `dd04_d` image (no grid): "No grid was found…", correct |
 | E. Map size change | Pass: 13 x 14 typed with a mask on screen, no pass, the download's `map_size` is 13 x 14 |

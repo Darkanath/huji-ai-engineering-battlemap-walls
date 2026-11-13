@@ -12,7 +12,9 @@ on 2026-11-13 before writing this file (research.md R13):
   session ends (tab closed or refreshed); it is used to remove the session's temp folder.
   `Blocks.unload(fn)` exists too, but its `fn` takes no arguments, so it cannot know which
   session ended.
-- `gr.File(file_types=[...], type="filepath")`: the browser offers only those types; the
+- `gr.File(file_types=[...], type="filepath")`: with `file_types` set, the server itself
+  refuses other types with Gradio's own wording ("Invalid file type…") before any handler
+  runs, so it is not set: `service.prepare` checks the type and shows the app's message. The
   handler gets a temp path with the uploaded file's base name. Events: upload, clear.
 - `Blocks.launch(max_file_size="20mb", show_error=False, server_name, server_port)`: the
   server refuses larger uploads; with `show_error=False` no exception text reaches the page.
@@ -280,7 +282,6 @@ def build_ui(settings: Settings) -> gr.Blocks:
     """The page, with every control from contracts/ui.md wired to the handlers above."""
     labels = service.button_labels(settings)
     app = settings.app
-    types = list(service.IMAGE_TYPES)
     # Gradio keeps uploads and downloads in its own cache too; delete files older than an hour,
     # checked every 30 minutes, so no upload outlives its session for long.
     with gr.Blocks(title="Battlemap Tracer", delete_cache=CACHE_CLEANUP) as page:
@@ -293,7 +294,6 @@ def build_ui(settings: Settings) -> gr.Blocks:
             with gr.Column(scale=1):
                 upload = gr.File(
                     label=f"Map image (PNG, JPEG or WebP, up to {app.max_upload_mb:g} MB)",
-                    file_types=types,
                     type="filepath",
                 )
                 gr.Markdown(NOTICE)

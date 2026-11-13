@@ -28,7 +28,7 @@ Upload and input (no model call is made):
 | Case | Message |
 | --- | --- |
 | Wrong file type | "That file type isn't supported. Upload a PNG, JPEG or WebP image." |
-| Over 20 MB | "That file is larger than 20 MB. Upload a smaller image." |
+| Over 20 MB | "That file is larger than 20 MB. Upload a smaller image." The server's upload limit (`max_file_size`) refuses such a file first, with Gradio's own wording; it is kept so a huge upload never reaches memory. The app's check stays as the second guard |
 | Not a readable image | "That file couldn't be opened as an image. Try exporting it again." |
 | Map size out of range | "Map width and height must be whole numbers from 1 to 200." |
 | Size does not match the image's proportions | "With this map size the grid squares would not be square. Check the width and height." (warning; does not block) |
