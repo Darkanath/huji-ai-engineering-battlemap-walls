@@ -157,7 +157,7 @@ source files.
 
 ## Making Dungeondraft maps
 
-What goes on each new layout and how its variants differ is in [map-specs.md](map-specs.md).
+What goes on each new layout and how its variants differ is in [map-specs.md](history/map-specs.md).
 
 - **Map size:** 25×25 squares unless the layout needs otherwise.
 - **Export:** Universal VTT with the **Roll20 grid preset** (70 px per square).
@@ -186,7 +186,7 @@ What goes on each new layout and how its variants differ is in [map-specs.md](ma
 
 Dungeon Alchemist (DA) furnishes rooms automatically and renders a 3D-looking style, so its maps
 add a second art style to the real data. Its exports were checked on the pilot `da01` (details
-in [map-specs.md](map-specs.md)).
+in [map-specs.md](history/map-specs.md)).
 
 - **Export:** Universal VTT, camera **Orthographic (Top Down)**, **72 DPI** (72 px per square;
   the rasterizer resizes to 70). Variant `d` exports lights to the **VTT data only**, so the

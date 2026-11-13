@@ -1,7 +1,7 @@
 # Results
 
 Scores of every predictor, filled in as runs finish: the Canny baseline, the stage-1 U-Net
-(first approach; how it was trained: [training.md](training.md)) and the Claude tracer. The test
+(first approach; how it was trained: [history/training.md](history/training.md)) and the Claude tracer. The test
 set runs once, in week 8.
 Metrics: [eval/metrics.py](../eval/metrics.py), at 32 px per square; boundary F1 tolerance 0.1
 square (3 px).

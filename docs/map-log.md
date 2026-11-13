@@ -4,7 +4,7 @@ Every real map made for the project: Dungeondraft maps in `data/raw/dungeondraft
 Alchemist maps in `data/raw/dungeon_alchemist/` (both gitignored), named
 `<layout>_<variant>.dd2vtt` as set in [labeling-rules.md](labeling-rules.md). All style variants
 of one layout always go in the same split. What each new layout should contain is in
-[map-specs.md](map-specs.md).
+[map-specs.md](history/map-specs.md).
 
 This log keeps what the file names leave out, for the data summary and the error analysis. Splits
 are in `data/processed/manifest.csv` (`python -m data.manifest`). The first build (21.10) put
@@ -84,13 +84,13 @@ the fence without a wall (low fences block movement, not sight: not walls). Spli
 train, which makes the Dungeondraft splits 6 / 1 / 1 with `dd04`–`dd08` done. By the split rule
 the next layout (`dd09`) goes to val.
 
-The next layouts, `dd04`–`dd13`, follow [map-specs.md](map-specs.md).
+The next layouts, `dd04`–`dd13`, follow [map-specs.md](history/map-specs.md).
 
 ## Dungeon Alchemist maps
 
 In `data/raw/dungeon_alchemist/` (originals in `original/`, lights converted with
-`data.retier_lights`; see [map-specs.md](map-specs.md)). 25×25 squares at 72 px per square. The
-next layouts, `da02`–`da06`, follow [map-specs.md](map-specs.md).
+`data.retier_lights`; see [map-specs.md](history/map-specs.md)). 25×25 squares at 72 px per square. The
+next layouts, `da02`–`da06`, follow [map-specs.md](history/map-specs.md).
 
 | File | Layout | Variant | Look | Wall / portal / light share | Lights (S / M / L) | Notes |
 | --- | --- | --- | --- | --- | --- | --- |

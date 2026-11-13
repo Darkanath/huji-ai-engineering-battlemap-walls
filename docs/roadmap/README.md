@@ -7,8 +7,8 @@ the real maps made so far are in [map-log.md](../map-log.md); every measurement 
 [results.md](../results.md).
 
 **The plan changed on 13.11** (week 4): the course staff allowed a large model in place of a
-trained one, and the Claude tracer replaced the U-Net. Weeks 1–3 are the record of the first
-approach and are left as they were written. Weeks 4–9 are rewritten around the tracer and its
+trained one, and the Claude tracer replaced the U-Net. Weeks 1–4 are the record of the first
+approach and the pivot, kept as written in `docs/history/roadmap/`. Weeks 4–9 are rewritten around the tracer and its
 app. Task-level detail for the app lives in `specs/001-battlemap-tracer-app/` (spec, plan,
 tasks); the week files point there instead of repeating it.
 
@@ -19,10 +19,10 @@ presentation (weeks 6–9). No more paid evaluation runs.
 
 | Week | Dates | Focus | File |
 | --- | --- | --- | --- |
-| 1 | 20–26.10 | Setup, rasterizer, labeling rules, first maps | [week-01.md](week-01.md) |
-| 2 | 27.10–2.11 | Manifest, synthetic generator, metrics, Canny baseline | [week-02.md](week-02.md) |
-| 3 | 3–9.11 | First U-Net on synthetic data (last week of the first approach) | [week-03.md](week-03.md) |
-| 4 | 10–16.11 | **Pivot:** Claude tracer, model comparisons, .dd2vtt writer, spec and plan | [week-04.md](week-04.md) |
+| 1 | 20–26.10 | Setup, rasterizer, labeling rules, first maps | [history/roadmap/week-01.md](../history/roadmap/week-01.md) |
+| 2 | 27.10–2.11 | Manifest, synthetic generator, metrics, Canny baseline | [history/roadmap/week-02.md](../history/roadmap/week-02.md) |
+| 3 | 3–9.11 | First U-Net on synthetic data (last week of the first approach) | [history/roadmap/week-03.md](../history/roadmap/week-03.md) |
+| 4 | 10–16.11 | **Pivot:** Claude tracer, model comparisons, .dd2vtt writer, spec and plan | [history/roadmap/week-04.md](../history/roadmap/week-04.md) |
 | 5 | 17–23.11 | The app. **Milestone: a file from the app imports into Roll20** | [week-05.md](week-05.md) |
 | 6 | 24–30.11 | Results table from existing runs (no new paid runs) | [week-06.md](week-06.md) |
 | 7 | 1–7.12 | Polish from trying the app, demo setup. **Feature freeze 07.12** | [week-07.md](week-07.md) |
@@ -50,5 +50,6 @@ presentation (weeks 6–9). No more paid evaluation runs.
   square), and every result goes in `docs/results.md` with its run name, cost and sample size.
 - There is no held-out test set (dropped 13.11). Third-party maps are used only to try and demo
   the app; they are never scored, committed or redistributed.
-- `train/`, the synthetic generator and the Colab notebook are frozen: no further work.
+- The first approach's code was removed on 13.11 (in git history up to `7a5979d`); its results stay
+  in `docs/results.md`.
 - If a week slips, cut from the items marked *(stretch)*, never from tests or the report.
