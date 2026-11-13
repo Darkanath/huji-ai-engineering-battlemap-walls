@@ -112,7 +112,7 @@ data/            rasterize.py (.dd2vtt -> mask, LIGHT_TIERS), manifest.py, retie
                  [gitignored]; Dungeon Alchemist exports keep their originals in original/
   processed/     image + mask pairs, manifest.csv                          [gitignored]
   reference/     dd04_a, dd06_a, dd07_a, dd04_d: the tracer's reference maps   [committed]
-  test/          published third-party maps, test only                     [never committed]
+  test/          published third-party maps, for trying the app only       [never committed]
 train/           U-Net training code, first approach                       [frozen]
 notebooks/       eda.ipynb; colab_train.ipynb                              [frozen]
 specs/           feature specs, plans and tasks (Spec Kit)
@@ -163,15 +163,15 @@ Datasets and runs are mounted as Docker volumes so they persist on the host.
   JPEG is lossy and would corrupt class ids.
 - **Real maps** = Dungeondraft (`ddNN`) + Dungeon Alchemist (`daNN`), both made by the user and
   labeled from their export. All style exports of one layout (`dd01_a`..`dd01_d`) stay in the
-  same split. The test set is run once, at the end.
+  same split. There is no held-out test set (dropped 13.11): the app is the deliverable.
 - Labeling rules: wall = blocks sight and movement (building walls, palisades, cave walls,
   cliffs). Portal = door or window in a wall. An open gap with no door is just a gap. Furniture,
   counters, rugs, trees, boulders and water are not walls. Light = a lit light source drawn in the
   image; its tier is set by its `range` in the .dd2vtt (see `docs/labeling-rules.md`).
 - Lights in a label mask: a disc at the light's `position`, radius by tier (0.25 / 0.40 / 0.60
   squares), drawn **under** walls and portals so a wall-mounted torch never cuts a gap in a wall.
-- Data licensing: published third-party maps go in the test set only and are never redistributed
-  or committed.
+- Data licensing: published third-party maps are used only to try and demo the app; they are
+  never scored, redistributed or committed.
 
 ## Working conventions
 

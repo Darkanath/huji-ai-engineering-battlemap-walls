@@ -49,8 +49,9 @@ the user cannot see are the main ways this project could do harm or overspend.
   next to the numbers.
 - A change that affects tracing (prompts, views, model, effort) MUST be re-scored on the
   labeled reference maps before it is called an improvement.
-- The test set is run once, at the end. Published third-party maps go in the test set only
-  and are never redistributed or committed.
+- There is no held-out test set (dropped 2026-11-13: the app is the deliverable). Published
+  third-party maps are used only to try and demonstrate the app; they are never scored,
+  redistributed or committed.
 
 **Rationale:** the project's main decision (a large model in place of a trained one) was made
 on measurements, and the presentation rests on them. Numbers without their method cannot be
@@ -147,4 +148,4 @@ too small.
   tasks. A plan that breaks a principle MUST say which one, why, and what simpler option was
   rejected; otherwise the plan is changed.
 
-**Version**: 1.3.0 | **Ratified**: 2026-11-13 | **Last Amended**: 2026-11-13
+**Version**: 1.4.0 | **Ratified**: 2026-11-13 | **Last Amended**: 2026-11-13
