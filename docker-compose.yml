@@ -16,6 +16,11 @@ services:
       - ./train:/app/train
       - ./postprocess:/app/postprocess
       - ./app:/app/app
+      - ./llm:/app/llm
+    # ANTHROPIC_API_KEY for the Claude wall tracer (llm/); .env is gitignored.
+    env_file:
+      - path: .env
+        required: false
     environment:
       # Physical cores on the i7-1365U (6 cores, 12 threads).
       OMP_NUM_THREADS: "6"

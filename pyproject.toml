@@ -17,6 +17,7 @@ dependencies = [
     "segmentation-models-pytorch",  # week 3: U-Net with a pretrained ResNet-18 encoder
     "albumentations",  # week 3: training augmentation (image and mask together)
     "mlflow",  # week 3: run tracking (params, metrics per epoch, artifacts)
+    "anthropic",  # week 4: Claude API for the wall tracer (llm/), approved 13.11
 ]
 
 [project.optional-dependencies]
@@ -26,7 +27,7 @@ dev = ["pytest", "ruff"]
 rasterize = "data.rasterize:main"
 
 [tool.setuptools.packages.find]
-include = ["data", "train", "eval", "postprocess", "app"]
+include = ["data", "train", "eval", "postprocess", "app", "llm"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

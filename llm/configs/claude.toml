@@ -1,0 +1,36 @@
+# Settings for the Claude wall tracer (llm/agent.py). Change the model here to compare models.
+
+[model]
+name = "claude-opus-5-5"   # also tried: claude-sonnet-5-5, claude-haiku-5-5, claude-fable-5-2
+effort = "medium"          # low | medium | high | xhigh | max: thinking depth and token spend
+max_tokens = 16000         # per response; one answer for a cave map is about 4,000 tokens
+# If a safety classifier declines a request, let the API re-run it on a fallback model
+# (not offered for Haiku). The run log records which model answered.
+fallbacks = true
+
+[limits]
+max_turns = 24             # API calls per map
+max_views = 16             # zoomed crops the model may ask for per map
+max_submissions = 3        # answers the model may submit (each one is checked on an overlay)
+max_cost_usd = 3.0         # stop a map when its estimated cost passes this
+
+[views]
+max_px = 1300              # longest side of any image sent to the model
+max_zoom = 160             # px per square, upper bound for close-ups
+jpeg_quality = 85
+quadrants = true           # send the four quarters of the map up front (v2), not only the overview
+
+# USD per million tokens, from Anthropic's price list as of 2026-11-03. Used only to estimate
+# cost in the run log; the Anthropic Console has the real bill.
+[prices."claude-fable-5-2"]
+input = 8.0
+output = 40.0
+[prices."claude-opus-5-5"]
+input = 4.0
+output = 20.0
+[prices."claude-sonnet-5-5"]
+input = 2.0
+output = 10.0
+[prices."claude-haiku-5-5"]
+input = 0.10
+output = 0.50
