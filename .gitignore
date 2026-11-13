@@ -5,6 +5,8 @@ data/raw/**
 !data/raw/dungeondraft/demo-training-map.dd2vtt
 data/processed/**
 !data/processed/.gitkeep
+# Published third-party maps: test only, never committed or redistributed
+data/test/
 
 # Checkpoints and run logs
 runs/*

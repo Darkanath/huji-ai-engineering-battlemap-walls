@@ -9,8 +9,10 @@ description = "Battlemap image -> Universal VTT (.dd2vtt) walls and portals for 
 requires-python = ">=3.12"
 license = { text = "MIT" }
 # Added one step at a time as each part of the pipeline needs them.
-# torch/torchvision are installed from the CPU wheel index in the Dockerfile.
+# Installed with uv from uv.lock (`uv sync --frozen` in the Dockerfile).
 dependencies = [
+    "torch",  # week 3: U-Net (first approach); CPU-only wheels, see [tool.uv.sources]
+    "torchvision",  # week 3: pretrained encoder weights; CPU-only wheels
     "numpy",
     "Pillow",
     "opencv-python-headless",  # week 2: Canny baseline, contours, distance transform for metrics
@@ -18,10 +20,27 @@ dependencies = [
     "albumentations",  # week 3: training augmentation (image and mask together)
     "mlflow",  # week 3: run tracking (params, metrics per epoch, artifacts)
     "anthropic",  # week 4: Claude API for the wall tracer (llm/), approved 13.11
+    "gradio",  # 2026-11-13: the app's UI (app/main.py), agreed in the project plan
+    "pydantic>=2",  # 2026-11-13: domain models and config validation (app/), asked for by the owner
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = ["pytest", "ruff"]
+
+[tool.uv]
+# The project runs only in the Linux container, so the lockfile resolves for Linux alone.
+environments = ["sys_platform == 'linux'"]
+
+# PyTorch comes from its CPU wheel index so the image never pulls CUDA. `explicit` keeps every
+# other package on PyPI.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchvision = [{ index = "pytorch-cpu" }]
 
 [project.scripts]
 rasterize = "data.rasterize:main"
@@ -36,6 +55,12 @@ addopts = "-ra"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Spec Kit's own scripts and the gitignored run folder are not project code.
+extend-exclude = [".specify", "runs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+# Tests import the shared fake client from tests/conftest.py as a local module.
+known-local-folder = ["conftest"]

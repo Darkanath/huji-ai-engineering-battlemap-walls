@@ -10,3 +10,7 @@ out
 **/*.egg-info
 .pytest_cache
 .ruff_cache
+# Secrets and third-party maps never go into the image
+.env
+.env.*
+data/test

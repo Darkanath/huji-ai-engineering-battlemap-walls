@@ -1,4 +1,4 @@
-# One service for everything: tests, data tools, training and (later) the Gradio app.
+# One service for everything: tests, data tools, the Claude tracer and the Gradio app.
 # Usage: docker compose run --rm app pytest
 services:
   app:
@@ -31,5 +31,5 @@ services:
       # The image has no git (training logs the commit on Colab); keep MLflow from warning.
       GIT_PYTHON_REFRESH: quiet
     ports:
-      # Gradio's default port, for the app in a later week.
+      # Gradio's port for the app: docker compose run --rm --service-ports app python -m app.main
       - "7860:7860"
