@@ -209,7 +209,7 @@ features and rebuilds the download, with no pass.
 - [X] T059 Record the reference runs in `docs/results.md` as a new dated section: the table (per map and profile: wall IoU, wall boundary F1, portal IoU, portal recall, light IoU, map size right, cost, time), the run names, the total cost, the number of runs per cell, and a line on how the map-size step changed time and cost
 - [X] T060 Update `expected_seconds` and `expected_cost_usd` in `llm/configs/claude.toml` to the measured values with the map-size step, and the same figures in `README.md`, `CLAUDE.md` ("Models" table) and `docs/PLAN.md`; if map-size accuracy is under 80%, record it and revise SC-009 in `spec.md` with the owner
 - [X] T061 [P] Update the docs to the built state: `README.md` (status boxes, the app's start command, drop "not built yet"), `CLAUDE.md` (stack: `gradio`, `pydantic`, `uv` now in use; repo layout for `app/`; the profiles are in the config), `docs/roadmap/week-05.md` (tick what is done)
-- [ ] T062 Walk through quickstart.md sections 1 to 3 in the browser (scenarios A to E; A, B and D are paid, about $0.45, with the owner's go-ahead) and note the result of each in `specs/001-battlemap-tracer-app/quickstart.md` under a dated "Validation run" heading
+- [ ] T062 Walk through quickstart.md sections 1 to 3 in the browser (scenarios A to E; A, B and D are paid, about $0.60, with the owner's go-ahead) and note the result of each in `specs/001-battlemap-tracer-app/quickstart.md` under a dated "Validation run" heading
 - [ ] T063 **Owner's step.** Upload a `.dd2vtt` downloaded from the app to Roll20 (Page Menu -> Upload Background) and confirm fog of war follows the walls (SC-002, the week 5 milestone); record it in `docs/results.md`
 
 ---
@@ -279,8 +279,8 @@ Then implementation:
 
 | Task | What | Estimated cost |
 | --- | --- | --- |
-| T058 | Reference evaluation, both profiles, four maps | about $1.40 |
-| T062 | Browser walkthrough, scenarios A, B, D | about $0.45 |
+| T058 | Reference evaluation, both profiles, four maps | about $1.40 (spent $1.63, plus $0.08 for a repeat) |
+| T062 | Browser walkthrough, scenarios A, B, D | about $0.60 |
 
 Every other task runs with the fake client and costs nothing.
 

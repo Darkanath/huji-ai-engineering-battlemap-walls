@@ -11,14 +11,14 @@ The product is now an app: the user uploads a map, a default **Sonnet** model su
 re-traces the map with **Opus**, and an always-present **Accept** button hands over the result
 as a `.dd2vtt` or `.uvtt` file.
 
-Measured on the two labeled maps (v2 harness, one run each), so the two buttons have honest
-expectations:
+Measured on the reference maps with the map-size step (v2 harness, one to three runs per map,
+13.11), so the two buttons have honest expectations:
 
 | | Sonnet 5.5 (default) | Opus 5.5 (deeper) |
 | --- | --- | --- |
-| Time per map | about 20 s | about 60 s |
-| Cost per map | about $0.07 | about $0.27 |
-| Wall boundary F1, castle / mine | 0.96 / 0.66 | 0.99 / 0.88 |
+| Time per map | about 25 s | about 70 s |
+| Cost per map | about $0.10 | about $0.32 |
+| Wall boundary F1, castle / mine | 0.91–0.97 / 0.55–0.66 | 0.99 / 0.88–0.89 |
 | Portals on the castle | none found | most found |
 
 Sonnet is a fast, cheap first draft that is good on buildings and weak on caves and doors; the
@@ -54,7 +54,7 @@ effort = "medium"
   override. Fable 5.2 stays available through `--model`.
 
 ### 2. App logic, separate from the UI: `app/service.py`
-Plain functions, testable with the fake client from `tests/test_llm_agent.py`:
+Plain functions, testable with the fake client in `tests/conftest.py`:
 
 - `prepare(image, squares_w, squares_h)`: validates the upload (`.png`, `.jpg`/`.jpeg`,
   `.webp`; squares at least 1), converts to RGB.
@@ -127,8 +127,8 @@ published third-party map) stays out of git.
    `ruff check . && ruff format --check .`: all green.
 2. Start the app, open `http://localhost:7860`, upload `data/test/map-26x28.jpeg` with 26 x 28
    squares:
-   - **Suggest walls** shows a Sonnet mask with time and cost (expected about $0.07).
-   - **Deeper examination** replaces it with an Opus mask (expected about $0.27).
+   - **Suggest walls** shows a Sonnet mask with time and cost (expected about $0.09 with the size typed).
+   - **Deeper examination** replaces it with an Opus mask (expected about $0.32).
    - **Accept mask** downloads a `.dd2vtt`, and again as `.uvtt`.
 3. Upload the downloaded file to Roll20 (Page Menu -> Upload Background) and check that fog of
    war follows the walls. This step is yours.

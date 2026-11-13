@@ -39,7 +39,7 @@ tasks); the week files point there instead of repeating it.
 
 - Configs are **TOML**, read with Python's built-in `tomllib`, so no YAML package is needed.
 - Model names, effort, limits and prices live in `llm/configs/claude.toml`, never in code.
-- Tests never make a paid call; they use the fake client from `tests/test_llm_agent.py`.
+- Tests never make a paid call; they use the fake client in `tests/conftest.py`.
 - A paid run larger than a few maps is approved by you first, with its estimated cost.
 - Every predictor is scored the same way (`data/rasterize.py` + `eval/metrics.py`, 32 px per
   square), and every result goes in `docs/results.md` with its run name, cost and sample size.

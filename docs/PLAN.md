@@ -127,7 +127,7 @@ All measured on `dd07_a` (castle) and `dd06_a` (mine); numbers and costs in [res
 3. **Tracer v2.** The four quarters are sent up front, so close reading no longer depends on the model asking. Every model improved: Opus portal IoU on the castle went from 0.25 to 0.70, Sonnet's cave boundary F1 doubled.
 4. **Model choice.** Fable 5.2 is the most accurate and the most expensive. Opus 5.5 is close on walls for about 60% of the cost, so it is the deep pass. Sonnet 5.5 is about four times cheaper and three times faster, so it is the default draft.
 
-Open points for the tracer: caves stay the weak spot (no model asked for a closer view of the mine); results are one run per cell, so run-to-run spread is unknown; working out the map size inside the pass is not built or measured yet.
+Open points for the tracer: caves stay the weak spot for the fast pass (Sonnet never asks for a closer view); the fast pass finds almost no doors on buildings; most results are one run per cell, and three fast runs on the castle spread from 0.91 to 0.97 boundary F1. The map size is worked out by Opus in both passes: right on 4 of 4 runs on maps with a grid, and "no grid" on the grid-less map (results.md, 13.11).
 
 ## First approach (20.10–9.11): trained U-Net
 

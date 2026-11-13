@@ -46,9 +46,9 @@ image, browser at `http://localhost:7860`.
 
 **Project Type**: local single-user web app, plus a command-line evaluation tool.
 
-**Performance Goals**: fast pass about 20 s and about $0.07 per map; deep pass about 60 s
-and about $0.27 (measured with the map size given; to be re-measured with the map-size
-step). Upload to download under 2 minutes with the fast pass (SC-001). Preview and export
+**Performance Goals**: fast pass about 25 s and about $0.10 per map; deep pass about 70 s
+and about $0.32 (measured 13.11 on the reference maps, including the map-size step on Opus;
+first planned at 20 s / $0.07 and 60 s / $0.27 without it). Upload to download under 2 minutes with the fast pass (SC-001). Preview and export
 after a map-size change in under 1 s, with no model call.
 
 **Constraints**: Python only, no JavaScript or hand-written HTML. Nothing leaves the laptop

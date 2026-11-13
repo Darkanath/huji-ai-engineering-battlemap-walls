@@ -11,8 +11,8 @@ What the user sees and can do. One Gradio page; `app/main.py` only wires these c
 | Map width, map height | Whole numbers 1 to 200, pre-filled 25 and 25 | Always |
 | Detect map size from the image | Checkbox, on for every new upload; turns off when the user types a size or a size is detected | Always |
 | Map size note | "Detected from the image", "No grid found: check the map size", or the proportions warning | Shown when it applies |
-| Suggest walls | Label includes "about 20 s, about $0.07" (from the config) | An image is loaded and no pass is running |
-| Deeper examination | Label includes "about 60 s, about $0.27" (from the config) | A mask is on screen and no pass is running |
+| Suggest walls | Label includes the expected time and cost from the config, e.g. "about 25 s, about $0.10" | An image is loaded and no pass is running |
+| Deeper examination | Label includes the expected time and cost from the config, e.g. "about 70 s, about $0.32" | A mask is on screen and no pass is running |
 | Deep-pass note | "The fast pass handles ordinary buildings well but often misses cave outlines and doors in castles and other complex structures. The deeper examination fixes most of that." | Always visible |
 | Preview | The map with walls, portals and lights drawn over it in three distinct colors, with a legend | Shows the upload alone until a mask exists |
 | Progress | "Working… 23 s", updated about once a second | While a pass runs |

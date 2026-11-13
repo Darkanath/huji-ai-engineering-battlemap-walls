@@ -41,9 +41,9 @@ showing its expected time and cost.
 
 ## 3. Validation scenarios
 
-Paid steps are marked. The whole list costs about $0.45.
+Paid steps are marked. The whole list costs about $0.60.
 
-### A. Fast pass to a file (User Story 1) — paid, about $0.07
+### A. Fast pass to a file (User Story 1) — paid, about $0.09
 
 1. Upload `data/test/map-26x28.jpeg`. Type 26 and 28 as the map size.
 2. Click "Suggest walls".
@@ -55,7 +55,7 @@ Paid steps are marked. The whole list costs about $0.45.
 6. **Owner's step:** in Roll20, Page Menu -> Upload Background with the `.dd2vtt`. Fog of
    war follows the walls.
 
-### B. Deeper examination (User Story 2) — paid, about $0.27
+### B. Deeper examination (User Story 2) — paid, about $0.32
 
 1. After A, click "Deeper examination".
 2. Expected: the mask is replaced; the status line shows "Opus 5.5 (medium)" with its own
@@ -75,7 +75,7 @@ Paid steps are marked. The whole list costs about $0.45.
 5. The other failure kinds (refusal, limits, timeout, unreadable answer) are covered by
    `tests/test_app_tracer.py` and `tests/test_app_service.py` with the fake client.
 
-### D. Map size worked out by the model (User Story 4) — paid, about $0.07 each
+### D. Map size worked out by the model (User Story 4) — paid, about $0.10 each
 
 1. Upload a map with a visible grid and leave the map size alone. Click "Suggest walls".
 2. Expected: the fields show the size the model found, with "Detected from the image"; the
@@ -93,7 +93,8 @@ Paid steps are marked. The whole list costs about $0.45.
 ## 4. Reference evaluation — paid, owner's approval first
 
 Scores the reference maps and checks the spec's thresholds (SC-003, SC-004, SC-009).
-About $0.30 for the fast profile and $1.10 for the deep one over four maps.
+About $0.40 for the fast profile and $1.30 for the deep one over four maps (13.11 run: $0.34
+and $1.29).
 
 ```bash
 docker compose run --rm app python -m llm.run --reference --profile quick --detect-size

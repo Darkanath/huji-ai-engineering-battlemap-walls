@@ -46,7 +46,8 @@ follows the walls.
    **Then** they show 25 x 25, the "detect map size from the image" option is on, and
    "Accept mask" is visible but disabled.
 2. **Given** a valid image is uploaded, **When** the user looks at the "Suggest walls" button,
-   **Then** it shows its expected time and cost (about 20 s, about $0.07) before any click.
+   **Then** it shows its expected time and cost (from the config; about 25 s, about $0.10 as
+   measured on 13.11) before any click.
 3. **Given** a valid image and map size, **When** the user clicks "Suggest walls" and the pass
    succeeds, **Then** the map is shown with walls, portals and lights drawn over it, each kind
    visually distinct from the other two.
@@ -82,7 +83,7 @@ examination", and compare the two masks against the map's labels.
 1. **Given** no suggestion exists yet, **When** the user looks at "Deeper examination",
    **Then** it is disabled.
 2. **Given** a suggestion exists, **When** the user looks at "Deeper examination", **Then** it
-   is enabled and shows its expected time and cost (about 60 s, about $0.27).
+   is enabled and shows its expected time and cost (about 70 s, about $0.32 as measured on 13.11).
 3. **Given** the app is open, **When** the user reads the note next to "Deeper examination",
    **Then** it says the fast pass handles ordinary buildings well but often misses cave
    outlines and doors in castles and other complex structures, and that the deep pass fixes
@@ -260,7 +261,9 @@ features as before.
 - **FR-009**: "Deeper examination" MUST be repeatable; each run replaces the previous mask, and
   the app MUST NOT offer a way back to an earlier mask.
 - **FR-010**: Each pass button MUST show its expected time and cost before it is clicked:
-  about 20 s and about $0.07 for the fast pass, about 60 s and about $0.27 for the deep pass.
+  values come from the config and are updated after each full reference evaluation (13.11:
+  about 25 s and about $0.10 for the fast pass, about 70 s and about $0.32 for the deep pass,
+  both including the map-size step).
 - **FR-011**: After each successful pass the status line MUST show the model used, the time
   taken, the estimated cost and the model's own note on what it was unsure of.
 - **FR-012**: A short note next to "Deeper examination" MUST tell the user when the deep pass
