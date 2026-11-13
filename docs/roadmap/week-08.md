@@ -1,41 +1,23 @@
-# Week 8 · 8–14.12 · Test set run, error analysis, system card
+# Week 8 · 8–14.12 · Write-up: system card, failure gallery, exhibits
 
-**Goal:** the one and only test-set run, an honest error analysis, and the system card.
+**Goal:** everything the presentation shows exists as a file. Writing only; no paid runs.
 
 ## You
 
-- [ ] **Approve the test-set run before it starts** (both profiles on every test map; the
-      cost is stated when the test set's size is known).
-- [ ] Time the manual Roll20 fixes on 3–5 test maps (the "Fix time" column).
-- [ ] Workshop session 14.12: show the results and collect feedback.
+- [ ] Workshop session 14.12: show the results and the app, collect feedback.
+- [ ] Record the demo video (about 2 minutes): map image -> app -> file -> Roll20 fog of war.
+      It is also the backup if the live demo fails.
 
-## Code
+## Code and docs
 
 | File | What |
 | --- | --- |
-| `eval/evaluate.py`, `llm/run.py` | Run every predictor in the results table on the test split, **once**, for in-domain and hard sets separately. Save to `runs/test/`. |
-| `eval/failure_gallery.py` | The worst test results by wall boundary F1: image, ground truth and answer side by side, saved as figures. |
-| `eval/figures.py` | Final figures: data summary, the first approach's curves and learning progression, results tables, cost per map. |
-| `docs/results.md` | Final tables (real maps, in-domain test, hard test), fix times, failure gallery with one line per failure. |
-| `docs/system-card.md` | What the system is: the models used and their versions, the data and its licensing, metrics, intended use, cost per map, privacy (images go to a third-party provider), limitations (caves, outdoor, photoreal, hex grids, multi-floor; light brightness from a tier table; results vary between runs). |
-
-## Run
-
-```bash
-docker compose run --rm app python -m eval.evaluate --all-models --split test    # after approval
-docker compose run --rm app python -m eval.failure_gallery --split test
-```
+| `docs/system-card.md` | Intended use; the models and why (measured); what is sent to Anthropic and what never leaves the laptop; results with sample sizes; known limitations (fast pass misses doors, caves are harder, map-size detection fails on faint grids and is off by default); cost per map; how failures reach the user. |
+| `docs/failure-gallery.md` | Four to six failures from existing runs, each with its image and one sentence on why: fast pass with no doors on the castle, the mine on the fast pass, the lakeside map's 56 x 32, and the false grid from floor tiles. |
+| `docs/exhibits/` | The images the slides use: before/after previews, the results chart, a Roll20 screenshot. |
 
 ## Done when
 
-- [ ] Test results recorded for every row of the results table, on both test splits.
-- [ ] Failure gallery done, each failure with one sentence on why.
-- [ ] System card and results written.
-
-## Report
-
-- Results tables, failure gallery, system card.
-
-## Dependencies
-
-None new. A plotting package for `eval/figures.py` is **new, ask first**.
+- [ ] System card and failure gallery written, every number traceable to `docs/results.md`.
+- [ ] Exhibits ready for the slides.
+- [ ] Demo video recorded.

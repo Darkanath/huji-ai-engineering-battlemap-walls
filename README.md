@@ -49,8 +49,9 @@ Week 4 of 9 (final presentation 2026-12-23).
 - [x] Gradio app: fast pass, deep pass, accept and download (tested with a fake model client)
 - [x] Map size worked out by the model during a pass (built; accuracy not measured yet)
 - [ ] Reference evaluation of both passes with the map-size step (paid; needs approval)
-- [ ] Full evaluation on all real maps (Canny, U-Net, both tracer passes)
-- [ ] Test set run, error analysis, system card
+- [x] Roll20 import of a file downloaded from the app
+- [ ] Results table from the existing runs
+- [ ] System card, failure gallery, presentation (23.12)
 
 ## Quick start
 
@@ -148,7 +149,7 @@ tests/           pytest
 
 The real maps were made for this project in Dungeondraft and Dungeon Alchemist; their labels come
 only from `.dd2vtt` exports and are used to score the tracer. Synthetic maps trained the stage-1
-U-Net. Published third-party maps are used only in the test set and are never redistributed.
+U-Net. Published third-party maps are used only to try the app and are never redistributed.
 
 ## License
 

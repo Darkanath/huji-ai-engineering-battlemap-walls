@@ -12,6 +12,11 @@ approach and are left as they were written. Weeks 4–9 are rewritten around the
 app. Task-level detail for the app lives in `specs/001-battlemap-tracer-app/` (spec, plan,
 tasks); the week files point there instead of repeating it.
 
+**Rewritten again on 13.11, after week 5:** the app is the project's deliverable and is built,
+tested and imported into Roll20. No model is trained and there is no held-out test set; what is
+left is a results table from the runs already made, polish, the write-up and the
+presentation (weeks 6–9). No more paid evaluation runs.
+
 | Week | Dates | Focus | File |
 | --- | --- | --- | --- |
 | 1 | 20–26.10 | Setup, rasterizer, labeling rules, first maps | [week-01.md](week-01.md) |
@@ -19,9 +24,9 @@ tasks); the week files point there instead of repeating it.
 | 3 | 3–9.11 | First U-Net on synthetic data (last week of the first approach) | [week-03.md](week-03.md) |
 | 4 | 10–16.11 | **Pivot:** Claude tracer, model comparisons, .dd2vtt writer, spec and plan | [week-04.md](week-04.md) |
 | 5 | 17–23.11 | The app. **Milestone: a file from the app imports into Roll20** | [week-05.md](week-05.md) |
-| 6 | 24–30.11 | Full evaluation run on the real maps, final test set | [week-06.md](week-06.md) |
-| 7 | 1–7.12 | App polish, request log, demo setup. **Feature freeze 07.12** | [week-07.md](week-07.md) |
-| 8 | 8–14.12 | Test set run, error analysis, system card | [week-08.md](week-08.md) |
+| 6 | 24–30.11 | Results table from existing runs (no new paid runs) | [week-06.md](week-06.md) |
+| 7 | 1–7.12 | Polish from trying the app, demo setup. **Feature freeze 07.12** | [week-07.md](week-07.md) |
+| 8 | 8–14.12 | System card, failure gallery, exhibits, demo video | [week-08.md](week-08.md) |
 | 9 | 15–23.12 | Slides, demo video, rehearsal. **Presentation 23.12** | [week-09.md](week-09.md) |
 
 ## How each week file works
@@ -43,6 +48,7 @@ tasks); the week files point there instead of repeating it.
 - A paid run larger than a few maps is approved by you first, with its estimated cost.
 - Every predictor is scored the same way (`data/rasterize.py` + `eval/metrics.py`, 32 px per
   square), and every result goes in `docs/results.md` with its run name, cost and sample size.
-- The test set is run **once**, in week 8, after the harness is frozen.
+- There is no held-out test set (dropped 13.11). Third-party maps are used only to try and demo
+  the app; they are never scored, committed or redistributed.
 - `train/`, the synthetic generator and the Colab notebook are frozen: no further work.
 - If a week slips, cut from the items marked *(stretch)*, never from tests or the report.

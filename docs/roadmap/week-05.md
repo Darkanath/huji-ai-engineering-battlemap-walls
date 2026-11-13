@@ -7,9 +7,9 @@ lists the pieces and what closes the week.
 ## You
 
 - [x] Approve `gradio` being added (already agreed in CLAUDE.md). Installed 13.11 with `pydantic`, under `uv`.
-- [ ] Try the app on `data/test/map-26x28.jpeg` (26 x 28 squares): fast pass, deep pass, accept
+- [x] Try the app on `data/test/map-26x28.jpeg` (26 x 28 squares): fast pass, deep pass, accept
       as `.dd2vtt` and as `.uvtt`. About $0.35 in paid calls.
-- [ ] **Milestone:** upload a file downloaded from the app to Roll20 (Page Menu -> Upload
+- [x] **Milestone:** upload a file downloaded from the app to Roll20 (Page Menu -> Upload
       Background) and check that fog of war follows the walls.
 
 ## Code
@@ -35,11 +35,11 @@ docker compose run --rm --service-ports app python -m app.main   # then open htt
 
 ## Done when
 
-- [ ] Upload -> suggest -> deeper examination -> accept -> download works in the browser.
+- [x] Upload -> suggest -> deeper examination -> accept -> download works (13.11, quickstart.md "Validation run").
 - [x] Each paid button shows its expected time and cost; the status line shows the actual ones.
 - [x] Every failure cause in the spec shows a message, never a stack trace, and the earlier
       mask stays (fake-client tests in `tests/test_app_tracer.py` and `tests/test_app_service.py`).
-- [ ] A file downloaded from the app imports into Roll20. **Milestone.**
+- [x] A file downloaded from the app imports into Roll20. **Milestone** (13.11; see results.md, T063).
 - [x] All tests pass; `ruff` clean (13.11: 244 tests).
 
 ## Report
