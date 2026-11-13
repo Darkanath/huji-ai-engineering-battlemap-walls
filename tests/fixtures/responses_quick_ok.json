@@ -1,0 +1,28 @@
+[
+  {
+    "stop_reason": "tool_use",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {"type": "text", "text": "Submitting the walls of the room."},
+      {
+        "type": "tool_use",
+        "name": "submit_answer",
+        "id": "toolu_01",
+        "input": {
+          "walls": [
+            {"points": [{"x": 1, "y": 1}, {"x": 4, "y": 1}]},
+            {"points": [{"x": 5, "y": 1}, {"x": 9, "y": 1}, {"x": 9, "y": 9}]}
+          ],
+          "arcs": [{"cx": 5, "cy": 5, "r": 2, "start_deg": 0, "end_deg": 90}],
+          "portals": [{"x1": 4, "y1": 1, "x2": 5, "y2": 1}],
+          "lights": [{"x": 3, "y": 6, "tier": "medium"}]
+        }
+      }
+    ]
+  },
+  {
+    "stop_reason": "end_turn",
+    "model": "claude-sonnet-5-5",
+    "content": [{"type": "text", "text": "The answer matches the map. Unsure about the door width."}]
+  }
+]

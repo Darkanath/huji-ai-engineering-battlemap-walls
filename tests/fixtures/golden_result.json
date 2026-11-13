@@ -1,0 +1,21 @@
+{
+  "walls": [
+    {"points": [{"fx": 0.1, "fy": 0.1}, {"fx": 0.4, "fy": 0.1}]},
+    {"points": [{"fx": 0.5, "fy": 0.1}, {"fx": 0.9, "fy": 0.1}, {"fx": 0.9, "fy": 0.9}]}
+  ],
+  "portals": [{"a": {"fx": 0.4, "fy": 0.1}, "b": {"fx": 0.5, "fy": 0.1}}],
+  "lights": [
+    {"at": {"fx": 0.3, "fy": 0.6}, "tier": "small"},
+    {"at": {"fx": 0.7, "fy": 0.5}, "tier": "large"}
+  ],
+  "note": "Golden fixture.",
+  "kind": "quick",
+  "model_id": "claude-sonnet-5-5",
+  "served_by": ["claude-sonnet-5-5"],
+  "effort": "medium",
+  "elapsed_s": 20.0,
+  "usage": {"input_tokens": 1000, "output_tokens": 100},
+  "cost_usd": 0.003,
+  "traced_size": {"width": 10, "height": 10},
+  "size_source": "typed"
+}
