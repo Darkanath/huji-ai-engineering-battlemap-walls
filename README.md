@@ -27,8 +27,9 @@ either pass:
 
 **The first approach** (weeks 1–3) was a U-Net trained on synthetic maps. On 13.11.2026 the
 course staff allowed a large model in place of a trained one, and the tracer scored far ahead of
-the stage-1 U-Net on real maps, so training stopped. The generator, training code and results
-stay in the repo as that record and as a comparison row.
+the stage-1 U-Net on real maps, so training stopped. Its results stay in
+[`docs/results.md`](docs/results.md) as a comparison row; its code (generator, training, Canny
+baseline) is in the git history up to commit `7a5979d`.
 
 See [`docs/PLAN.md`](docs/PLAN.md) for the full plan and evaluation,
 [`specs/001-battlemap-tracer-app/spec.md`](specs/001-battlemap-tracer-app/spec.md) for what the
@@ -58,7 +59,7 @@ Week 4 of 9 (final presentation 2026-12-23).
 Requires Docker with Docker Compose. On Windows, enable WSL integration in Docker Desktop.
 
 ```bash
-docker compose build                    # Ubuntu 24.04, Python 3.12, CPU-only PyTorch, uv.lock
+docker compose build                    # Ubuntu 24.04, Python 3.12, uv.lock
 docker compose run --rm app pytest      # run the tests (no paid calls)
 docker compose run --rm app ruff check  # lint
 ```
@@ -105,12 +106,6 @@ docker compose run --rm app python -m data.rasterize \
 Mask classes: `0` background, `1` wall, `2` portal, `3` light. Masks are always PNG so class ids
 stay exact.
 
-Score the Canny baseline on a split (per-map and mean metrics in `runs/<predictor>_<split>/metrics.csv`):
-
-```bash
-docker compose run --rm app python -m eval.evaluate --predictor canny --split val
-```
-
 Dungeon Alchemist exports set light ranges per asset, not by tier. Map them to the tiers first
 (the originals in `original/` are never changed):
 
@@ -127,18 +122,17 @@ llm/             Claude wall tracer: agent.py (tool loop), views.py (grid views,
 postprocess/     uvtt.py: the tracer's answer -> .dd2vtt / .uvtt
 app/             Gradio app: service.py (logic), main.py (page wiring), tracer.py (one pass),
                  exporter.py, render.py, domain.py, config.py, errors.py, logging.py
-eval/            metrics (pixel IoU, boundary F1), Canny baseline, evaluate.py
+eval/            metrics.py: pixel IoU, wall boundary F1, portal recall
 data/            rasterize.py (.dd2vtt -> mask), manifest.py, retier_lights.py (other tools'
-                 lights -> tiers), configs/; generator.py + synth/ (first approach)
-  raw/           source .dd2vtt files: dungeondraft/, dungeon_alchemist/, synthetic/, test/
+                 lights -> tiers), configs/
+  raw/           source .dd2vtt files: dungeondraft/, dungeon_alchemist/
                  (gitignored, except the demo map used by the tests)
   processed/     image + mask pairs, manifest.csv (gitignored)
   reference/     four labeled maps for the tracer's reference evaluation (committed)
-train/           U-Net training code (first approach, frozen)
-notebooks/       eda.ipynb, colab_train.ipynb (first approach, frozen)
+notebooks/       eda.ipynb: data exploration for the Data slide
 specs/           feature specs, plans and tasks
-docs/            PLAN.md, app-plan.md, results.md, labeling-rules.md, lessons.md, map-specs.md,
-                 map-log.md, training.md (history), roadmap/
+docs/            PLAN.md, results.md, lessons.md, labeling-rules.md, map-log.md, roadmap/,
+                 history/ (training notes, old map specs, app plan, roadmap weeks 1-4)
 runs/            run outputs: answers, previews, scores (gitignored)
 tests/           pytest
 ```

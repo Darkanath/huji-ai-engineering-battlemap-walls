@@ -8,8 +8,7 @@
   `docker-compose.yml`, `pyproject.toml`/requirements, config files (YAML/TOML) and docs.
 - There MUST be no JavaScript and no hand-written HTML. The UI is built with Gradio.
 - Everything MUST run on the laptop's CPU under Docker Compose (Ubuntu 24.04 base image,
-  Python 3.12 in a virtual environment). The image keeps the CPU-only PyTorch build; CUDA
-  dependencies MUST NOT be added.
+  Python 3.12 in a virtual environment). GPU and CUDA dependencies MUST NOT be added.
 - Commands are run through Docker Compose, for example `docker compose run --rm app pytest`.
 - Local first: the app, the data and every tool run on the laptop. The only traffic that
   leaves it is the model call, made with the project owner's API key. Cloud deployment is
@@ -42,8 +41,8 @@ the user cannot see are the main ways this project could do harm or overspend.
   labels.
 - Labels MUST come only from `.dd2vtt` files. Code MUST NOT read or depend on
   `.dungeondraft_map` source files.
-- Every predictor (Canny baseline, the frozen stage-1 U-Net, each Claude profile) MUST be
-  scored the same way, and results MUST be recorded in `docs/results.md` with the command or
+- Every predictor (each Claude profile; the Canny baseline and the stage-1 U-Net were scored
+  the same way before their code was removed) MUST be scored the same way, and results MUST be recorded in `docs/results.md` with the command or
   run name that produced them, the cost, and the sample size.
 - Known weaknesses of a comparison (one run per cell, leaks, small samples) MUST be written
   next to the numbers.
@@ -85,8 +84,9 @@ same care as its successes.
   constitution is amended: hand-editing the mask,
   user accounts, storing uploads after the session, output formats other than Universal VTT,
   and further work on model training.
-- `train/`, the synthetic generator and the Colab notebook stay in the repo untouched, as the
-  record of the first approach and the source of the U-Net comparison row.
+- The first approach's code (U-Net training, synthetic generator, Colab training notebook,
+  Canny baseline) was removed on 2026-11-13. It lives in the git history (up to commit
+  `7a5979d`); its results stay in `docs/results.md` as the comparison row.
 
 **Rationale:** a solo project with a fixed presentation date fails by growing, not by being
 too small.
@@ -148,4 +148,4 @@ too small.
   tasks. A plan that breaks a principle MUST say which one, why, and what simpler option was
   rejected; otherwise the plan is changed.
 
-**Version**: 1.4.0 | **Ratified**: 2026-11-13 | **Last Amended**: 2026-11-13
+**Version**: 2.0.0 | **Ratified**: 2026-11-13 | **Last Amended**: 2026-11-13

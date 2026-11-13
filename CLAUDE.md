@@ -7,19 +7,19 @@ upload to Roll20 for dynamic lighting and fog of war.
 The core is a **Claude wall tracer** (`llm/`): a large vision model reads the map image and
 answers with walls, portals and lights in grid squares. The course staff allowed a large model in
 place of a trained one on 2026-11-13, and the measurements in `docs/results.md` showed it beats
-the trained U-Net. **Model training is dropped**; `train/`, the synthetic generator and the
-Colab notebook stay in the repo untouched, as the record of the first approach and the source of
-the U-Net comparison row. No further work on them.
+the trained U-Net. **Model training is dropped**, and the first approach's code (U-Net training,
+synthetic generator, Colab training notebook, Canny baseline) was removed on 2026-11-13; it is
+in the git history up to commit `7a5979d`, and its results stay in `docs/results.md`.
 
 Where to look before starting a piece of work:
 
 - `.specify/memory/constitution.md`: the project's principles. It wins over this file where they
   disagree.
 - `specs/NNN-name/`: the spec, plan and tasks of each feature (current: `specs/001-battlemap-tracer-app/`).
-- `docs/app-plan.md`: the app plan the current spec grew from. `docs/results.md`: every measurement.
+- `docs/results.md`: every measurement. `docs/lessons.md`: what didn't work, for the slides.
 - `docs/PLAN.md`: the project plan, rewritten around the tracer on 2026-11-13. `docs/roadmap/`:
-  week-by-week tasks (index in `docs/roadmap/README.md`); weeks 1-3 are the record of the first
-  approach. `docs/training.md` is history.
+  weeks 5-9 (index in `docs/roadmap/README.md`). `docs/history/`: the first approach's training
+  notes, the old map specs, the app plan the spec grew from, and roadmap weeks 1-4.
 
 Final presentation: 2026-12-23.
 
@@ -37,7 +37,8 @@ Final presentation: 2026-12-23.
   light's **size tier** (small / medium / large) and a lookup table, never from a per-light
   estimate.
 - **Runs on the laptop under Docker** (Intel CPU, no NVIDIA GPU), Ubuntu 24.04 base image, started
-  with Docker Compose. The image keeps the **CPU-only PyTorch build**: never add CUDA dependencies.
+  with Docker Compose. No GPU or CUDA dependencies; nothing heavy runs locally (the model runs
+  at Anthropic).
 - **Paid model calls are visible and approved.**
   - The app shows each paid action's expected time and cost before the click, and the actual
     time and estimated cost after it.
@@ -65,12 +66,11 @@ Final presentation: 2026-12-23.
 
 - Python 3.12 (Ubuntu 24.04 default), in a virtual environment inside the container (PEP 668).
 - In use: `anthropic` (Claude API), `gradio` (UI), `pydantic` v2 (domain models and config),
-  `numpy`, `Pillow`, `opencv-python-headless`, `pytest`, `ruff`. From the first approach, still
-  installed: PyTorch + torchvision CPU wheels, `segmentation_models_pytorch`, `albumentations`,
-  `mlflow`.
-- Dependencies are managed with `uv`: declared in `pyproject.toml` (PyTorch from the CPU wheel
-  index through `[tool.uv.sources]`), locked in `uv.lock`, installed with `uv sync --frozen` in
-  the Dockerfile. After changing one, run `uv lock` and rebuild the image.
+  `numpy`, `Pillow`, `opencv-python-headless` (boundary F1), `pytest`, `ruff`. The first
+  approach's PyTorch, `segmentation_models_pytorch`, `albumentations` and `mlflow` were removed
+  on 2026-11-13.
+- Dependencies are managed with `uv`: declared in `pyproject.toml`, locked in `uv.lock`,
+  installed with `uv sync --frozen` in the Dockerfile. After changing one, run `uv lock` and rebuild the image.
 - Agreed but not yet installed: `shapely` (visibility IoU, a stretch metric).
   Add a package only in the change that first uses it, and ask before adding anything not
   listed here.
@@ -104,19 +104,17 @@ postprocess/     uvtt.py: the tracer's answer -> .dd2vtt / .uvtt (answer_to_uvtt
 app/             Gradio app: service.py (logic, testable), main.py (UI wiring only),
                  tracer.py (run_pass: the only model call), exporter.py, render.py, domain.py
                  (Pydantic models, fractions <-> grid squares), config.py, errors.py, logging.py
-eval/            metrics (pixel IoU, boundary F1), Canny baseline, evaluate.py
+eval/            metrics.py: pixel IoU, wall boundary F1, portal recall
 data/            rasterize.py (.dd2vtt -> mask, LIGHT_TIERS), manifest.py, retier_lights.py +
-                 configs/light_sources.toml (Dungeon Alchemist lights -> tiers); generator.py +
-                 synth/ (synthetic maps, first approach)
-  raw/           source .dd2vtt files (dungeondraft/, dungeon_alchemist/, synthetic/, test/)
+                 configs/light_sources.toml (Dungeon Alchemist lights -> tiers)
+  raw/           source .dd2vtt files (dungeondraft/, dungeon_alchemist/)
                  [gitignored]; Dungeon Alchemist exports keep their originals in original/
   processed/     image + mask pairs, manifest.csv                          [gitignored]
   reference/     dd04_a, dd06_a, dd07_a, dd04_d: the tracer's reference maps   [committed]
   test/          published third-party maps, for trying the app only       [never committed]
-train/           U-Net training code, first approach                       [frozen]
-notebooks/       eda.ipynb; colab_train.ipynb                              [frozen]
+notebooks/       eda.ipynb: data exploration for the Data slide (runs on Colab)
 specs/           feature specs, plans and tasks (Spec Kit)
-docs/            app-plan.md, results.md, PLAN.md, labeling rules, map specs and log, roadmap
+docs/            PLAN.md, results.md, lessons.md, labeling rules, map log, roadmap/, history/
 runs/            run outputs, answers, previews, scores                    [gitignored]
 tests/           pytest
 ```
@@ -157,7 +155,8 @@ Datasets and runs are mounted as Docker volumes so they persist on the host.
   does not run a pass.
 - **Evaluation:** answers are rasterized with `data/rasterize.py` and scored with
   `eval/metrics.py` at **32 px per square** (boundary F1 tolerance 0.1 square), the same way for
-  every predictor: Canny, the frozen stage-1 U-Net, each Claude profile. Results go in
+  every predictor (the Canny and U-Net rows from the first approach were scored this way too).
+  Results go in
   `docs/results.md` with the run name, cost and sample size.
 - **Storage formats:** map images and previews are JPEG (quality 90). Masks are **always PNG**:
   JPEG is lossy and would corrupt class ids.
