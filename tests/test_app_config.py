@@ -92,7 +92,12 @@ def test_shipped_chunked_settings_load():
         "sonnet",
         "opus",
     ]
-    assert all(chunked.agents[a].estimate for a in chunked.agents)
+    # Sonnet and Haiku were measured on 23.11; Opus is still an estimate.
+    assert [chunked.agents[a].estimate for a in ("haiku", "sonnet", "opus")] == [
+        False,
+        False,
+        True,
+    ]
 
 
 @pytest.mark.parametrize(
@@ -121,11 +126,11 @@ def test_expected_figures_follow_the_map_size_choice_and_detection():
     settings = load_settings()
     chunked = settings.chunked
     seconds, cost = chunked.expected((25, 25), "sonnet", detect=False, size_step=settings.size_step)
-    assert seconds == pytest.approx(45) and cost == pytest.approx(0.29)
+    assert seconds == pytest.approx(35) and cost == pytest.approx(0.23)
     seconds, cost = chunked.expected((25, 25), "sonnet", detect=True, size_step=settings.size_step)
-    assert seconds == pytest.approx(53) and cost == pytest.approx(0.32)
+    assert seconds == pytest.approx(43) and cost == pytest.approx(0.26)
     seconds, cost = chunked.expected((13, 13), "sonnet", detect=False, size_step=settings.size_step)
-    assert seconds == pytest.approx(25) and cost == pytest.approx(0.06)  # one chunk, no review
+    assert seconds == pytest.approx(17) and cost == pytest.approx(0.04)  # one chunk, no review
     _, cost = chunked.expected((50, 50), "opus", detect=False, size_step=settings.size_step)
     assert len(chunked.layout((50, 50), "opus")) == 16 and cost == pytest.approx(3.35)
 
@@ -140,7 +145,7 @@ def test_each_model_has_its_own_part_size():
     assert len(chunked.layout((25, 25), "sonnet")) == 4
     assert len(chunked.layout((200, 200), "haiku")) == 16
     seconds, cost = chunked.expected((25, 25), "haiku", detect=False, size_step=settings.size_step)
-    assert seconds == pytest.approx(140) and cost == pytest.approx(0.13)
+    assert seconds == pytest.approx(98) and cost == pytest.approx(0.1228)
 
 
 def test_expected_max_is_the_four_by_four_layout():
@@ -149,4 +154,4 @@ def test_expected_max_is_the_four_by_four_layout():
     seconds, cost = settings.chunked.expected_max(
         "sonnet", detect=True, size_step=settings.size_step
     )
-    assert seconds == pytest.approx(128) and cost == pytest.approx(1.04)
+    assert seconds == pytest.approx(94) and cost == pytest.approx(0.74)

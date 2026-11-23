@@ -96,7 +96,8 @@ overlap_squares = 1        # each chunk also sees and traces this far into its n
 max_per_side = 4           # at most 4 x 4 = 16 chunks; larger maps get larger chunks
 max_parallel = 4           # agents running at the same time; further parts wait for a free one
 
-# One entry per selector choice. `core_squares` is the largest side of a part's own area for
+# One entry per selector choice (Sonnet and Haiku measured on the reference maps 23.11; Opus
+# still estimated). `core_squares` is the largest side of a part's own area for
 # that model (sides are split evenly): Haiku needs smaller parts than Sonnet and Opus (owner,
 # 23.11, after the first live runs). ESTIMATE figures are replaced after the measured run
 # (research.md R5, R13); `estimate = false` then drops the "estimate" word on the button.
@@ -110,9 +111,9 @@ fallbacks = false                   # not offered for Haiku
 orchestrator = "sonnet"
 deadline_s = 180                    # the whole pass
 max_cost_usd = 1.0                  # the whole map; chunks not started yet are skipped past it
-expected_seconds_per_chunk = 30     # ESTIMATE
-expected_cost_per_chunk_usd = 0.005 # ESTIMATE
-estimate = true
+expected_seconds_per_chunk = 20     # measured 23.11: one round of 4 parts (docs/results.md)
+expected_cost_per_chunk_usd = 0.0033 # measured 23.11
+estimate = false
 
 [chunked.agents.sonnet]
 core_squares = 13                   # 4 parts on 25 x 25
@@ -124,9 +125,9 @@ fallbacks = true
 orchestrator = "sonnet"
 deadline_s = 180
 max_cost_usd = 2.5
-expected_seconds_per_chunk = 25     # ESTIMATE
-expected_cost_per_chunk_usd = 0.06  # ESTIMATE
-estimate = true
+expected_seconds_per_chunk = 17     # measured 23.11: one round of 4 parts (docs/results.md)
+expected_cost_per_chunk_usd = 0.04  # measured 23.11
+estimate = false
 
 [chunked.agents.opus]
 core_squares = 13
@@ -154,8 +155,8 @@ max_turns = 10
 max_views = 6
 max_submissions = 2
 max_cost_usd = 0.75
-expected_seconds = { sonnet = 20, opus = 45 }        # ESTIMATE, by orchestrator
-expected_cost_usd = { sonnet = 0.05, opus = 0.15 }   # ESTIMATE, by orchestrator
+expected_seconds = { sonnet = 18, opus = 45 }        # sonnet measured 23.11 (13-23 s); opus ESTIMATE
+expected_cost_usd = { sonnet = 0.07, opus = 0.15 }   # sonnet measured 23.11 ($0.045-0.095); opus ESTIMATE
 
 [chunked.merge]
 join_tolerance_squares = 0.3        # wall ends on a seam closer than this are joined

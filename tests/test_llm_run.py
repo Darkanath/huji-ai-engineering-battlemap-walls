@@ -179,14 +179,14 @@ def test_chunked_run_writes_every_file_and_both_score_sets(chunked_setup):
 
 
 def test_chunked_estimate_is_chunks_times_cost_plus_review(chunked_setup, monkeypatch, capsys):
-    """Without --yes the prompt states 4 x $0.06 + $0.05 = $0.29 for the map; "n" sends
+    """Without --yes the prompt states 4 x $0.04 + $0.07 = $0.23 for the map; "n" sends
     nothing."""
     out, client = chunked_setup
     monkeypatch.setattr("sys.stdin", io.StringIO("n\n"))
     run.main(CHUNKED_ARGS)
     printed = capsys.readouterr().out
-    assert "estimated cost about $0.29" in printed
-    assert "4 chunks" in printed and "$0.06 per chunk" in printed
+    assert "estimated cost about $0.23" in printed
+    assert "4 chunks" in printed and "$0.04 per chunk" in printed
     assert client.requests == {} and not out.exists()
 
 

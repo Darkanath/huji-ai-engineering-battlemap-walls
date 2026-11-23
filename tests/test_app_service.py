@@ -513,25 +513,26 @@ def test_chunked_pass_starts_like_the_fast_one_and_carries_its_board(session):
 
 
 def test_chunked_button_label_follows_map_size_choice_and_detection(settings):
-    """Chunk count, agents' model, time and cost, marked as an estimate; the existing two
-    labels are unchanged; with detection on, the 16-part upper bound is shown too."""
+    """Chunk count, agents' model, time and cost (measured for Sonnet and Haiku, marked as an
+    estimate for Opus); the existing two labels are unchanged; with detection on, the 16-part
+    upper bound is shown too."""
     size = MapSize(width=25, height=25)
     labels = service.button_labels(settings, size, False, "sonnet")
-    assert labels[CHUNKED] == (
-        "Chunked pass: 4 parts on 4 Sonnet agents (about 45 s, about $0.29, estimate)"
-    )
+    assert labels[CHUNKED] == ("Chunked pass: 4 parts on 4 Sonnet agents (about 35 s, about $0.23)")
     assert labels[QUICK] == "Suggest walls (about 25 s, about $0.10)"
     assert labels[DEEP] == "Deeper examination (about 70 s, about $0.32)"
     big = service.button_labels(settings, MapSize(width=50, height=50), False, "haiku")
-    assert big[CHUNKED].startswith("Chunked pass: 16 parts on 4 Haiku agents (about 140 s")
+    assert big[CHUNKED].startswith("Chunked pass: 16 parts on 4 Haiku agents (about 98 s")
     small_haiku = service.button_labels(settings, size, False, "haiku")[CHUNKED]
-    assert small_haiku.startswith("Chunked pass: 16 parts on 4 Haiku agents (about 140 s")
+    assert small_haiku.startswith("Chunked pass: 16 parts on 4 Haiku agents (about 98 s")
+    opus = service.button_labels(settings, size, False, "opus")[CHUNKED]
+    assert opus.endswith(", estimate)")  # not measured yet
     detecting = service.button_labels(settings, size, True, "sonnet")[CHUNKED]
-    assert "4 parts on 4 Sonnet agents for 25 x 25 (about 53 s, about $0.32, estimate)" in detecting
-    assert detecting.endswith("up to $1.04 and 128 s if the detected size needs 16 parts")
+    assert "4 parts on 4 Sonnet agents for 25 x 25 (about 43 s, about $0.26)" in detecting
+    assert detecting.endswith("up to $0.74 and 94 s if the detected size needs 16 parts")
     one = service.button_labels(settings, MapSize(width=10, height=10), False, "sonnet")
     assert one[CHUNKED].startswith(
-        "Chunked pass: 1 part on 1 Sonnet agent (about 25 s, about $0.06"
+        "Chunked pass: 1 part on 1 Sonnet agent (about 17 s, about $0.04"
     )
 
 
