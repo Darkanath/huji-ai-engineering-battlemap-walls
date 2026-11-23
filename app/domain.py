@@ -17,6 +17,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from llm.orchestrator import ChunkState
+from llm.review import ReviewState
 from postprocess.uvtt import arc_points
 
 MIN_SQUARES, MAX_SQUARES = 1, 200
@@ -86,10 +88,14 @@ class MapSizeSource(StrEnum):
 
 
 class PassKind(StrEnum):
-    """Which pass: the fast suggestion or the deeper examination."""
+    """Which pass: the fast suggestion, the deeper examination, or the chunked pass."""
 
     quick = "quick"
     deep = "deep"
+    chunked = "chunked"  # specs/002-chunked-map-tracing/
+
+
+AgentChoice = Literal["haiku", "sonnet", "opus"]  # the chunked pass's selector
 
 
 class Usage(BaseModel):
@@ -102,6 +108,32 @@ class Usage(BaseModel):
     turns: int = 0
     views: int = 0
     submissions: int = 0
+
+
+class ChunkReport(BaseModel):
+    """One chunk agent's row in the agent table (spec FR-019)."""
+
+    part: int  # 1-based, as in the preview and the messages
+    state: ChunkState
+    failure: str | None = None  # a FailureKind value, or "limit" for a skipped part
+    seconds: float = 0.0
+    cost_usd: float = 0.0
+    views: int = 0  # closer views it asked for
+    walls: int = 0  # in its own answer, before merging
+    portals: int = 0
+    lights: int = 0
+
+
+class ReviewReport(BaseModel):
+    """The seam review's row in the agent table."""
+
+    state: ReviewState
+    failure: str | None = None  # a FailureKind value, or "limit" when skipped for time or cost
+    model_label: str = ""
+    seconds: float = 0.0
+    cost_usd: float = 0.0
+    removed: dict[str, int] = {}  # walls / portals / lights taken out of the strips
+    added: dict[str, int] = {}
 
 
 class TraceResult(BaseModel):
@@ -120,6 +152,12 @@ class TraceResult(BaseModel):
     cost_usd: float
     traced_size: MapSize
     size_source: MapSizeSource
+    # The chunked pass only; empty for "Suggest walls" and "Deeper examination".
+    agents: AgentChoice | None = None
+    orchestrator_model: str | None = None
+    chunks: list[ChunkReport] = []
+    review: ReviewReport | None = None
+    untraced: list[tuple[Point, Point]] = []  # each untraced core's corners, as fractions
 
     def is_empty(self) -> bool:
         """True when the pass found no walls, portals or lights."""

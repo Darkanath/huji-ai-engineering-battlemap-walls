@@ -7,14 +7,16 @@ import anthropic
 import pytest
 from PIL import Image
 
-from app import service
+from app import service, tracer
 from app.config import load_settings
 from app.domain import (
+    ChunkReport,
     Light,
     MapSize,
     MapSizeSource,
     PassKind,
     Point,
+    ReviewReport,
     TraceResult,
     Usage,
     Wall,
@@ -24,12 +26,18 @@ from app.errors import (
     EMPTY_MASK,
     NO_GRID,
     NOT_SQUARE,
+    SEAMS_NOT_CHECKED,
     FailureKind,
     MapSizeInvalid,
     PassFailure,
     UploadRejected,
 )
 from data.rasterize import load_uvtt
+from llm.merge import chunk_layout
+from llm.orchestrator import ChunkState
+from llm.review import ReviewState
+
+from conftest import RoutingFake, call, reply, span, text
 
 QUICK, DEEP = PassKind.quick, PassKind.deep
 
@@ -424,3 +432,187 @@ def test_export_is_rebuilt_only_on_a_change(session, monkeypatch):
     service.set_map_size(session, 30, 30)
     service.export(session)
     assert len(calls) == 2
+
+
+# --- The chunked pass (feature 002) ----------------------------------------------------------
+
+CHUNKED = PassKind.chunked
+
+
+def chunked_result(states=("done",) * 4, review="done") -> TraceResult:
+    """A chunked pass's result with one report per part and a review report."""
+    base = make_result()
+    chunks = [
+        ChunkReport(
+            part=i + 1,
+            state=ChunkState(s),
+            seconds=20.0 + i,
+            cost_usd=0.05,
+            views=i,
+            walls=2,
+            portals=1,
+            lights=0,
+            failure={"done": None, "failed": "timeout", "skipped": "limit"}[s],
+        )
+        for i, s in enumerate(states)
+    ]
+    review_report = ReviewReport(
+        state=ReviewState(review),
+        model_label="Sonnet 5.5",
+        seconds=12.0,
+        cost_usd=0.04,
+        failure={"done": None, "failed": "refusal", "skipped": "limit", "not_needed": None}[review],
+        removed={"walls": 1, "portals": 0, "lights": 0} if review == "done" else {},
+        added={"walls": 2, "portals": 0, "lights": 1} if review == "done" else {},
+    )
+    untraced = [(Point(fx=0.5, fy=0), Point(fx=1, fy=0.5)) for s in states if s != "done"]
+    return base.model_copy(
+        update={
+            "kind": CHUNKED,
+            "agents": "sonnet",
+            "orchestrator_model": "claude-sonnet-5-5",
+            "chunks": chunks,
+            "review": review_report,
+            "untraced": untraced,
+            "cost_usd": 0.27,
+            "elapsed_s": 41.0,
+        }
+    )
+
+
+def test_set_agents_accepts_only_the_three_choices(session):
+    """The selector's value: Sonnet by default, Haiku or Opus when picked, nothing else."""
+    assert session.agents == "sonnet"
+    service.set_agents(session, "haiku")
+    assert session.agents == "haiku"
+    service.set_agents(session, "fable")
+    assert session.agents == "haiku"
+
+
+def test_chunked_pass_starts_like_the_fast_one_and_carries_its_board(session):
+    """No mask is needed; the ticket names the agents and the session gets a waiting board."""
+    assert service.can_start(session, CHUNKED)
+    service.set_agents(session, "opus")
+    ticket = service.begin_pass(session, CHUNKED)
+    assert ticket.agents == "opus"
+    assert session.board.total == 4 and session.board.done_count() == 0
+    assert not service.can_start(session, CHUNKED)  # one pass at a time
+    service.finish_pass(session, ticket, chunked_result())
+    assert session.board is None and session.running is None
+
+
+def test_chunked_button_label_follows_map_size_choice_and_detection(settings):
+    """Chunk count, agents' model, time and cost, marked as an estimate; the existing two
+    labels are unchanged; with detection on, the 16-part upper bound is shown too."""
+    size = MapSize(width=25, height=25)
+    labels = service.button_labels(settings, size, False, "sonnet")
+    assert labels[CHUNKED] == "Chunked pass: 4 Sonnet agents (about 45 s, about $0.29, estimate)"
+    assert labels[QUICK] == "Suggest walls (about 25 s, about $0.10)"
+    assert labels[DEEP] == "Deeper examination (about 70 s, about $0.32)"
+    big = service.button_labels(settings, MapSize(width=50, height=50), False, "haiku")
+    assert big[CHUNKED].startswith("Chunked pass: 16 Haiku agents (about 140 s, about $0.13")
+    detecting = service.button_labels(settings, size, True, "sonnet")[CHUNKED]
+    assert "4 Sonnet agents for 25 x 25 (about 53 s, about $0.32, estimate)" in detecting
+    assert detecting.endswith("up to $1.04 and 128 s if the detected size needs 16 parts")
+    one = service.button_labels(settings, MapSize(width=10, height=10), False, "sonnet")
+    assert one[CHUNKED].startswith("Chunked pass: 1 Sonnet agent (about 25 s, about $0.06")
+
+
+def test_progress_line_counts_parts_then_says_the_borders_are_checked(session):
+    """ "Working… N s", then the parts done, then the review."""
+    service.begin_pass(session, CHUNKED)
+    assert service.progress_line(session).endswith(" · 0 of 4 parts done")
+    session.board.update_chunk(0, ChunkState.done)
+    session.board.update_chunk(1, ChunkState.done)
+    assert service.progress_line(session).endswith(" · 2 of 4 parts done")
+    session.board.update_review(ReviewState.reviewing)
+    assert service.progress_line(session).endswith(" · checking the borders")
+    assert service.progress_line(session).startswith("Working… ")
+
+
+def test_agent_table_has_a_row_per_part_and_one_for_the_borders(session):
+    """FR-019: part, state and reason, time, cost, views and counts; the borders row last."""
+    run(session, chunked_result(states=("done", "failed", "done", "skipped")), CHUNKED)
+    rows = service.agent_table(session)
+    assert len(rows) == 5
+    assert rows[0] == ["Part 1", "done", "20 s", "$0.05", 0, 2, 1, 0]
+    assert rows[1][:2] == ["Part 2", "failed: timed out"]
+    assert rows[3][:2] == ["Part 4", "skipped: limit reached"]
+    assert rows[4][:4] == ["Borders (Sonnet 5.5)", "done: 1 removed, 3 added", "12 s", "$0.04"]
+    assert service.AGENT_TABLE_HEADERS[0] == "Part"
+
+
+def test_agent_table_is_none_after_a_single_session_pass(session):
+    """The table belongs to the chunked pass only."""
+    assert service.agent_table(session) is None
+    run(session, make_result())
+    assert service.agent_table(session) is None
+
+
+def test_chunked_status_line_names_agents_orchestrator_time_and_cost(session):
+    """The status line of a chunked result."""
+    run(session, chunked_result(), CHUNKED)
+    line = service.status_line(session)
+    assert line.startswith("Chunked · 4 Sonnet 5.5 agents + Sonnet 5.5 orchestrator · 41 s")
+    assert "about $0.27" in line
+
+
+def test_partial_and_unchecked_results_say_so(session):
+    """Untraced parts are named by number; an unreviewed result says the borders were not
+    checked; a complete one says nothing."""
+    run(
+        session, chunked_result(states=("done", "failed", "done", "done"), review="failed"), CHUNKED
+    )
+    text = service.result_message(session)
+    assert text.startswith("Part 2 of 4 could not be traced (it took too long).")
+    assert SEAMS_NOT_CHECKED in text
+    run(session, chunked_result(), CHUNKED)
+    assert service.result_message(session) == ""
+
+
+def test_preview_draws_the_board_while_the_chunked_pass_runs(session):
+    """While running, the preview is the map with the parts tinted; afterwards the mask."""
+    plain = service.preview(session)
+    service.begin_pass(session, CHUNKED)
+    session.board.update_chunk(0, ChunkState.tracing)
+    running = service.preview(session)
+    assert running.tobytes() != plain.tobytes()
+
+
+def test_a_chunked_pass_runs_from_click_to_file(session, settings):
+    """Quickstart step 3: begin, run with a routing fake, finish, export; the file loads with
+    the merged counts."""
+    windows = [c.window for c in chunk_layout((25, 25), 13, 1, 4)]
+    left = {"points": [{"x": 3, "y": 5}, {"x": 13.5, "y": 5}]}
+    right = {"points": [{"x": 11.5, "y": 5}, {"x": 22, "y": 5}]}
+    door = {"x1": 5, "y1": 20, "x2": 6, "y2": 20}
+
+    def submits(walls=(), portals=()):
+        """One agent's script."""
+        answer = {"walls": list(walls), "arcs": [], "portals": list(portals), "lights": []}
+        return [reply(call("submit_answer", answer)), reply(text("Done."), stop="end_turn")]
+
+    client = RoutingFake(
+        {
+            span(windows[0]): submits([left]),
+            span(windows[1]): submits([right]),
+            span(windows[2]): submits(portals=[door]),
+            span(windows[3]): submits(),
+        }
+    )
+    ticket = service.begin_pass(session, CHUNKED)
+    outcome = tracer.run_pass(
+        session.image,
+        ticket.map_size,
+        ticket.fallback_size,
+        CHUNKED,
+        settings,
+        client,
+        ticket.size_source,
+        agents=ticket.agents,
+        board=session.board,
+    )
+    assert service.finish_pass(session, ticket, outcome)
+    uvtt = load_uvtt(service.export(session))
+    assert len(uvtt["line_of_sight"]) == 1 and len(uvtt["portals"]) == 1
+    assert len(service.agent_table(session)) == 5

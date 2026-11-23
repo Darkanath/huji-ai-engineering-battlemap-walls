@@ -1,5 +1,5 @@
 """The Gradio page: wiring only. Every decision is made in `app/service.py`; the only model call
-is `app.tracer.run_pass`, started by the two pass buttons.
+is `app.tracer.run_pass`, started by the three pass buttons.
 
 Run with: docker compose run --rm --service-ports app python -m app.main (http://localhost:7860)
 
@@ -27,6 +27,10 @@ on 2026-11-13 before writing this file (research.md R13):
 - Generator handlers: each `yield` updates the outputs, which gives the "Working… N s" line.
   Each event listener runs one call at a time by default, and different listeners run
   side by side, so an upload or a map-size change is handled while a pass runs.
+- `gr.Radio(choices=[(label, value), ...])` shows each label and hands the handler the value;
+  events: select, change, input (checked in the installed source on 2026-11-23, feature 002).
+- `gr.Dataframe(value=rows, headers=[...], interactive=False)` shows a read-only table; a
+  handler shows, hides or refills it by returning `gr.Dataframe(value=..., visible=...)`.
 - `gr.Number` events include `input`, `blur` and `submit`; `change` also fires when a handler
   sets the value, so it is not used for typed sizes. Its own `minimum`/`maximum` reject a
   value with a raw error before the handler runs, so they are not set: the range check and
@@ -47,6 +51,10 @@ from app.logging import log_event, setup_logging
 from app.render import LEGEND
 
 NOTICE = "Your image is sent to Anthropic, a third-party AI provider, for analysis."
+CHUNKED_NOTE = (
+    "Splits the map into parts and traces each with its own AI agent at the same time; an "
+    "orchestrator model then checks the borders where the parts meet."
+)
 DEEP_NOTE = (
     "The fast pass handles ordinary buildings well but often misses cave outlines and doors "
     "in castles and other complex structures. The deeper examination fixes most of that."
@@ -82,7 +90,10 @@ def _close(holder: Holder) -> None:
 def view(holder: Holder) -> tuple:
     """Every output's value for the current state, in the order of `outputs` in `build_ui`."""
     s = holder.session
-    labels = service.button_labels(SETTINGS)
+    if s is not None:
+        labels = service.button_labels(SETTINGS, s.map_size, s.detect_size, s.agents)
+    else:
+        labels = service.button_labels(SETTINGS, detect=SETTINGS.app.detect_size_default)
     running = s is not None and s.running is not None
     download = None
     if s is not None and s.result is not None:
@@ -92,6 +103,7 @@ def view(holder: Holder) -> tuple:
             log_event("export_failed", detail=type(error).__name__)
             holder.notice = message(FailureKind.unexpected)
     message_text = holder.notice or service.result_message(s)
+    rows = service.agent_table(s)
     return (
         service.preview(s) if s is not None else None,
         service.status_line(s),
@@ -104,7 +116,18 @@ def view(holder: Holder) -> tuple:
         gr.Button(labels[PassKind.deep], interactive=service.can_start(s, PassKind.deep)),
         gr.DownloadButton("Accept mask", value=download, interactive=download is not None),
         "" if not running else gr.skip(),
+        gr.Radio(
+            value=s.agents if s is not None else SETTINGS.chunked.default_agents,
+            interactive=not running,
+        ),
+        gr.Button(labels[PassKind.chunked], interactive=service.can_start(s, PassKind.chunked)),
+        gr.Dataframe(value=_cells(rows), visible=rows is not None),
     )
+
+
+def _cells(rows: list[list] | None) -> list[list[str]]:
+    """The agent table's rows as text, so every column shows the same way."""
+    return [[str(cell) for cell in row] for row in rows or []]
 
 
 def safe(handler):
@@ -216,11 +239,19 @@ def on_extension(holder: Holder, extension: str) -> tuple:
     return view(holder)
 
 
-def _progress(seconds: float) -> tuple:
-    """Outputs while a pass runs: only the progress line and the locked buttons change."""
+def _progress(session: service.Session) -> tuple:
+    """Outputs while a pass runs: the progress line and the locked controls change; for the
+    chunked pass the preview shows its parts' states too."""
     skip = gr.skip()
     locked = gr.Button(interactive=False)
-    return (skip,) * 7 + (locked, locked, skip, f"Working… {seconds:.0f} s")
+    chunked = session.running == PassKind.chunked
+    first = service.preview(session) if chunked else skip
+    return (
+        (first,)
+        + (skip,) * 6
+        + (locked, locked, skip, service.progress_line(session))
+        + (gr.Radio(interactive=False), locked, skip)
+    )
 
 
 def _pass(holder: Holder, width, height, detect: bool, kind: PassKind):
@@ -240,16 +271,20 @@ def _pass(holder: Holder, width, height, detect: bool, kind: PassKind):
     if ticket is None:
         yield view(holder)
         return
-    yield _progress(0)
+    yield _progress(s)
     future: Future = EXECUTOR.submit(
-        tracer.run_pass,
-        s.image,
-        ticket.map_size,
-        ticket.fallback_size,
-        kind,
-        SETTINGS,
-        None,
-        ticket.size_source,
+        functools.partial(
+            tracer.run_pass,
+            s.image,
+            ticket.map_size,
+            ticket.fallback_size,
+            kind,
+            SETTINGS,
+            client=None,
+            size_source=ticket.size_source,
+            agents=ticket.agents,
+            board=s.board,
+        )
     )
     while not future.done():
         if holder.session is not s:
@@ -261,7 +296,7 @@ def _pass(holder: Holder, width, height, detect: bool, kind: PassKind):
             yield view(holder)
             return
         time.sleep(TICK_S)
-        yield _progress(service.elapsed(s))
+        yield _progress(s)
     service.finish_pass(holder.session, ticket, future.result())
     yield view(holder)
 
@@ -278,10 +313,27 @@ def on_deep(holder: Holder, width, height, detect: bool):
     yield from _pass(holder, width, height, detect, PassKind.deep)
 
 
+@safe
+def on_agents(holder: Holder, choice: str) -> tuple:
+    """The agents' model selector changed: remember it and refresh the chunked label."""
+    if holder.session is not None:
+        service.set_agents(holder.session, choice)
+    return view(holder)
+
+
+@safe_stream
+def on_chunked(holder: Holder, width, height, detect: bool, choice: str):
+    """The chunked pass: parts traced by agents at the same time, then the borders checked."""
+    if holder.session is not None:
+        service.set_agents(holder.session, choice)
+    yield from _pass(holder, width, height, detect, PassKind.chunked)
+
+
 def build_ui(settings: Settings) -> gr.Blocks:
     """The page, with every control from contracts/ui.md wired to the handlers above."""
-    labels = service.button_labels(settings)
+    labels = service.button_labels(settings, detect=settings.app.detect_size_default)
     app = settings.app
+    chunked = settings.chunked
     # Gradio keeps uploads and downloads in its own cache too; delete files older than an hour,
     # checked every 30 minutes, so no upload outlives its session for long.
     with gr.Blocks(title="Battlemap Tracer", delete_cache=CACHE_CLEANUP) as page:
@@ -319,6 +371,13 @@ def build_ui(settings: Settings) -> gr.Blocks:
                 quick = gr.Button(labels[PassKind.quick], variant="primary", interactive=False)
                 deep = gr.Button(labels[PassKind.deep], interactive=False)
                 gr.Markdown(DEEP_NOTE)
+                agents = gr.Radio(
+                    [(a.label, key) for key, a in chunked.agents.items()],
+                    value=chunked.default_agents,
+                    label="Agents' model (chunked pass)",
+                )
+                chunked_button = gr.Button(labels[PassKind.chunked], interactive=False)
+                gr.Markdown(CHUNKED_NOTE)
                 progress = gr.Markdown()
                 extension = gr.Radio(list(service.EXTENSIONS), value=".dd2vtt", label="File type")
                 accept = gr.DownloadButton("Accept mask", interactive=False)
@@ -329,6 +388,12 @@ def build_ui(settings: Settings) -> gr.Blocks:
                 gr.Markdown(LEGEND)
                 status = gr.Markdown()
                 notice = gr.Markdown()
+                table = gr.Dataframe(
+                    headers=service.AGENT_TABLE_HEADERS,
+                    label="Agents",
+                    interactive=False,
+                    visible=False,
+                )
 
         outputs = [
             preview,
@@ -342,6 +407,9 @@ def build_ui(settings: Settings) -> gr.Blocks:
             deep,
             accept,
             progress,
+            agents,
+            chunked_button,
+            table,
         ]
         upload.upload(on_upload, [holder, upload], outputs)
         upload.clear(on_clear, [holder], outputs)
@@ -353,6 +421,8 @@ def build_ui(settings: Settings) -> gr.Blocks:
         extension.input(on_extension, [holder, extension], outputs)
         quick.click(on_quick, [holder, width, height, detect], outputs)
         deep.click(on_deep, [holder, width, height, detect], outputs)
+        agents.input(on_agents, [holder, agents], outputs)
+        chunked_button.click(on_chunked, [holder, width, height, detect, agents], outputs)
     return page
 
 

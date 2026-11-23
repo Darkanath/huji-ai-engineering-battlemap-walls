@@ -33,6 +33,21 @@ ALLOWED = {
     "walls",
     "portals",
     "lights",
+    # The chunked pass (specs/002-chunked-map-tracing/): its parts, merge and seam review.
+    "agents",
+    "orchestrator",
+    "part",
+    "window",
+    "state",
+    "chunks",
+    "chunks_failed",
+    "chunks_skipped",
+    "review",
+    "removed",
+    "added",
+    "joins",
+    "ends_snapped",
+    "pieces_dropped",
 }
 
 

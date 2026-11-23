@@ -1,17 +1,24 @@
 """One pass with the scripted fake client: results, the map-size step, and every failure kind."""
 
+import json
+import logging
+
 import anthropic
 import httpx2
 import pytest
 from PIL import Image
 
 from app.config import load_settings
-from app.domain import MapSize, MapSizeSource, PassKind, TraceResult
-from app.errors import FailureKind, PassFailure
+from app.domain import ChunkReport, MapSize, MapSizeSource, PassKind, TraceResult
+from app.errors import LIMIT, FailureKind, PassFailure
+from app.progress import ChunkBoard
 from app.tracer import run_pass
 from llm import agent
+from llm.merge import chunk_layout, seams
+from llm.orchestrator import ChunkState
+from llm.review import ReviewState
 
-from conftest import FIXTURES, FakeClient, call, load_responses, reply, text
+from conftest import FIXTURES, FakeClient, RoutingFake, call, load_responses, reply, span, text
 
 TEN = MapSize(width=10, height=10)
 FALLBACK = MapSize(width=25, height=25)
@@ -253,3 +260,191 @@ def test_the_app_client_makes_no_retries(image, settings, monkeypatch):
     monkeypatch.setattr(anthropic, "Anthropic", fake)
     assert isinstance(run_pass(image, TEN, FALLBACK, PassKind.quick, settings), TraceResult)
     assert made == {"max_retries": 0}
+
+
+# --- The chunked pass (feature 002) ----------------------------------------------------------
+
+
+MAP25 = MapSize(width=25, height=25)
+WINDOWS = [c.window for c in chunk_layout((25, 25), 13, 1, 4)]
+LEFT_WALL = {"points": [{"x": 3, "y": 5}, {"x": 13.5, "y": 5.1}]}
+RIGHT_WALL = {"points": [{"x": 11.5, "y": 4.9}, {"x": 22, "y": 5}]}
+
+
+def chunk_answer(*walls) -> dict:
+    """A chunk agent's submit_answer input."""
+    return {"walls": list(walls), "arcs": [], "portals": [], "lights": []}
+
+
+def submits(answer: dict) -> list:
+    """An agent (or reviewer, with `tool`) that submits once and finishes."""
+    return [reply(call("submit_answer", answer)), reply(text("Done."), stop="end_turn")]
+
+
+def routes(review=None, **overrides) -> RoutingFake:
+    """Four agents (two trace a wall across the seam), and a review script."""
+    table = {
+        span(WINDOWS[0]): submits(chunk_answer(LEFT_WALL)),
+        span(WINDOWS[1]): submits(chunk_answer(RIGHT_WALL)),
+        span(WINDOWS[2]): submits(chunk_answer()),
+        span(WINDOWS[3]): submits(chunk_answer()),
+        "review": review if review is not None else [reply(text("Fine."), stop="end_turn")] * 2,
+    }
+    for index, script in overrides.items():
+        table[span(WINDOWS[int(index[1:])])] = script
+    return RoutingFake(table)
+
+
+@pytest.fixture
+def big_image() -> Image.Image:
+    """A plain 25 x 25 square map at 20 px per square."""
+    return Image.new("RGB", (500, 500), (90, 90, 90))
+
+
+def chunked(image, settings, client, size=MAP25, board=None, agents="sonnet"):
+    """Run a chunked pass with the given fake client."""
+    return run_pass(
+        image, size, FALLBACK, PassKind.chunked, settings, client, agents=agents, board=board
+    )
+
+
+def logged(caplog) -> list[dict]:
+    """The `battlemap` logger's records as parsed JSON."""
+    return [json.loads(r.getMessage()) for r in caplog.records if r.name == "battlemap"]
+
+
+def test_chunked_pass_returns_the_merged_mask_with_reports(big_image, settings, caplog):
+    """Four agents and an orchestrator: one mask, a report per part, the review's report, the
+    agents' and orchestrator's models, and every cost in the total."""
+    client = routes()
+    with caplog.at_level(logging.INFO, logger="battlemap"):
+        result = chunked(big_image, settings, client)
+    assert isinstance(result, TraceResult) and result.kind == PassKind.chunked
+    assert len(result.walls) == 1  # the seam wall, joined
+    assert result.agents == "sonnet" and result.model_id == "claude-sonnet-5-5"
+    assert result.orchestrator_model == "claude-sonnet-5-5"
+    assert [c.part for c in result.chunks] == [1, 2, 3, 4]
+    assert result.chunks[0] == ChunkReport(
+        part=1,
+        state=ChunkState.done,
+        seconds=result.chunks[0].seconds,
+        cost_usd=result.chunks[0].cost_usd,
+        walls=1,
+    )
+    assert result.review.state == ReviewState.failed  # the fake reviewer never submits
+    assert result.review.model_label == "Sonnet 5.5"
+    assert result.untraced == []
+    assert result.cost_usd == pytest.approx(
+        sum(c.cost_usd for c in result.chunks) + result.review.cost_usd
+    )
+    events = logged(caplog)
+    finished = [e for e in events if e["event"] == "chunk_finished"]
+    assert len(finished) == 4
+    assert set(finished[0]) >= {
+        "part",
+        "window",
+        "model",
+        "state",
+        "turns",
+        "views",
+        "submissions",
+        "cost_usd",
+        "elapsed_s",
+    }
+    assert finished[0]["window"] == span(WINDOWS[0])
+    assert any(e["event"] == "review_finished" for e in events)
+    final = [e for e in events if e["event"] == "pass_finished"][0]
+    assert final["profile"] == "chunked" and final["chunks"] == 4 and final["agents"] == "sonnet"
+
+
+def test_one_failed_part_gives_a_partial_result(big_image, settings):
+    """A part that fails is reported with its kind and outlined as untraced."""
+    client = routes(c1=[anthropic.APITimeoutError(request=REQUEST)])
+    result = chunked(big_image, settings, client)
+    assert isinstance(result, TraceResult)
+    assert result.chunks[1].state == ChunkState.failed
+    assert result.chunks[1].failure == FailureKind.timeout.value
+    (corner_a, corner_b) = result.untraced[0]
+    assert (corner_a.fx, corner_a.fy, corner_b.fx, corner_b.fy) == (0.5, 0, 1, 0.5)
+
+
+def test_no_part_done_fails_with_the_first_failed_parts_kind(big_image, settings):
+    """Every part fails: a PassFailure with the first failed part's kind."""
+    refuse = [reply(text("no"), stop="refusal")]
+    client = routes(
+        c0=[anthropic.APIConnectionError(request=REQUEST)], c1=refuse, c2=refuse, c3=refuse
+    )
+    result = chunked(big_image, settings, client)
+    assert isinstance(result, PassFailure) and result.kind == FailureKind.network
+    assert result.kind_of_pass == PassKind.chunked
+
+
+def test_every_part_skipped_is_a_pass_limit(big_image, settings, monkeypatch):
+    """No time for any part: pass_limit."""
+    monkeypatch.setattr(settings.chunked.agents["sonnet"], "deadline_s", 1e-9)
+    result = chunked(big_image, settings, routes())
+    assert isinstance(result, PassFailure) and result.kind == FailureKind.pass_limit
+
+
+def test_chunked_missing_key_fails_before_any_request(big_image, settings, monkeypatch):
+    """No key: missing_key, and no client is made."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(anthropic, "Anthropic", lambda *a, **k: pytest.fail("client created"))
+    result = run_pass(big_image, MAP25, FALLBACK, PassKind.chunked, settings, agents="sonnet")
+    assert isinstance(result, PassFailure) and result.kind == FailureKind.missing_key
+
+
+def test_detected_size_rebuilds_the_board_before_any_agent(big_image, settings):
+    """With the size step on, the board is set for the detected size before agents start."""
+    layout = chunk_layout((10, 10), 13, 1, 4)
+    board = ChunkBoard(layout, seams(layout, (10, 10), 1.0))
+    client = routes()
+    client.routes["other"] = [size_reply(True, 25, 25)]
+    result = chunked(big_image, settings, client, size=None, board=board)
+    assert isinstance(result, TraceResult) and result.size_source == MapSizeSource.detected
+    assert board.total == 4 and board.done_count() == 4
+
+
+def test_a_failed_review_keeps_the_merged_mask(big_image, settings):
+    """The reviewer's request fails: the merged mask stands, the review says why."""
+    client = routes(review=[anthropic.APIConnectionError(request=REQUEST)])
+    result = chunked(big_image, settings, client)
+    assert isinstance(result, TraceResult) and len(result.walls) == 1
+    assert result.review.state == ReviewState.failed
+    assert result.review.failure == FailureKind.network.value
+
+
+def status(cls, code):
+    """An SDK status error with `code`."""
+    return cls("x", response=httpx2.Response(code, request=REQUEST), body=None)
+
+
+FAILURES = [
+    (reply(text("no"), stop="refusal"), FailureKind.refusal),
+    (reply(text("long"), stop="max_tokens"), FailureKind.output_limit),
+    (status(anthropic.RateLimitError, 429), FailureKind.rate_limit),
+    (status(anthropic.InternalServerError, 529), FailureKind.provider_busy),
+    (status(anthropic.AuthenticationError, 401), FailureKind.auth),
+    (anthropic.APIConnectionError(request=REQUEST), FailureKind.network),
+    (anthropic.APITimeoutError(request=REQUEST), FailureKind.timeout),
+]
+
+
+@pytest.mark.parametrize(("item", "kind"), FAILURES, ids=[k.value for _, k in FAILURES])
+def test_every_failure_kind_ends_a_part_or_the_review_plainly(big_image, settings, item, kind):
+    """Each cause, once in a part and once in the review, gives a result, never an error."""
+    result = chunked(big_image, settings, routes(c2=[item]))
+    assert isinstance(result, TraceResult)
+    assert result.chunks[2].state == ChunkState.failed and result.chunks[2].failure == kind.value
+    result = chunked(big_image, settings, routes(review=[item]))
+    assert isinstance(result, TraceResult)
+    assert result.review.state == ReviewState.failed and result.review.failure == kind.value
+
+
+def test_a_skipped_review_says_limit(big_image, settings, monkeypatch):
+    """Agents used the whole budget: the review is skipped with the limit as its reason."""
+    monkeypatch.setattr(settings.chunked.agents["sonnet"], "max_cost_usd", 0.001)
+    monkeypatch.setattr(settings.chunked, "max_parallel", 4)
+    result = chunked(big_image, settings, routes())
+    assert isinstance(result, TraceResult)
+    assert result.review.state == ReviewState.skipped and result.review.failure == LIMIT

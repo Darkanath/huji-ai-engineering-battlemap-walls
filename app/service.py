@@ -17,18 +17,26 @@ from PIL import Image, UnidentifiedImageError
 
 from app import exporter, render
 from app.config import Settings
-from app.domain import MapSize, MapSizeSource, PassKind, TraceResult
+from app.domain import AgentChoice, MapSize, MapSizeSource, PassKind, TraceResult
 from app.errors import (
     EMPTY_MASK,
+    LIMIT,
     NO_GRID,
     NOT_SQUARE,
+    SEAMS_NOT_CHECKED,
     MapSizeInvalid,
     PassFailure,
     UploadRejected,
     detected_note,
     message,
+    partial_message,
+    short_reason,
 )
 from app.logging import log_event
+from app.progress import ChunkBoard
+from llm.merge import seams
+from llm.orchestrator import ChunkState
+from llm.review import ReviewState
 
 IMAGE_TYPES = (".png", ".jpg", ".jpeg", ".webp")
 EXTENSIONS = (".dd2vtt", ".uvtt")
@@ -58,6 +66,9 @@ class Session:
     # The last export file and what it was built from, so it is rebuilt only on a change.
     export_key: tuple | None = None
     export_path: Path | None = None
+    # The chunked pass: the selector's value, and the live board while that pass runs.
+    agents: AgentChoice = "sonnet"
+    board: ChunkBoard | None = None
 
 
 @dataclass(frozen=True)
@@ -71,6 +82,7 @@ class PassTicket:
     fallback_size: MapSize
     size_source: MapSizeSource
     size_version: int
+    agents: AgentChoice | None = None  # the chunked pass's agents; None for the other passes
 
 
 def prepare(path: str | Path, settings: Settings) -> Session:
@@ -98,6 +110,7 @@ def prepare(path: str | Path, settings: Settings) -> Session:
         tmp_dir=Path(tempfile.mkdtemp(prefix="battlemap-")),
         map_size=MapSize(width=app.default_width, height=app.default_height),
         detect_size=app.detect_size_default,
+        agents=settings.chunked.default_agents,
     )
 
 
@@ -151,11 +164,20 @@ def set_detect(session: Session, on: bool) -> None:
     session.detect_size = bool(on)
 
 
+def set_agents(session: Session, choice: str) -> None:
+    """Pick the chunked pass's agents' model (the selector); anything else is ignored."""
+    if choice in session.settings.chunked.agents:
+        session.agents = choice
+
+
 def can_start(session: Session | None, kind: PassKind) -> bool:
-    """Whether a pass of `kind` may start: an image, nothing running, and for deep a mask."""
+    """Whether a pass of `kind` may start: an image, nothing running, and for deep a mask.
+
+    The chunked pass starts like the fast one: it needs no earlier mask.
+    """
     if session is None or session.running is not None:
         return False
-    return kind == PassKind.quick or session.result is not None
+    return kind in (PassKind.quick, PassKind.chunked) or session.result is not None
 
 
 def begin_pass(session: Session, kind: PassKind) -> PassTicket | None:
@@ -164,6 +186,11 @@ def begin_pass(session: Session, kind: PassKind) -> PassTicket | None:
         return None
     now = time.monotonic()
     session.running, session.started_at = kind, now
+    if kind == PassKind.chunked:
+        chunked = session.settings.chunked
+        size = session.map_size.as_tuple()
+        layout = chunked.layout(size)
+        session.board = ChunkBoard(layout, seams(layout, size, chunked.review.strip_squares))
     return PassTicket(
         token=session.token,
         kind=kind,
@@ -172,6 +199,7 @@ def begin_pass(session: Session, kind: PassKind) -> PassTicket | None:
         fallback_size=session.map_size,
         size_source=session.size_source,
         size_version=session.size_version,
+        agents=session.agents if kind == PassKind.chunked else None,
     )
 
 
@@ -189,6 +217,7 @@ def finish_pass(
         log_event("pass_dropped", profile=ticket.kind.value, cost_usd=outcome.cost_usd)
         return False
     session.running = session.started_at = None
+    session.board = None
     if isinstance(outcome, PassFailure):
         session.last_failure = outcome
         return True
@@ -214,8 +243,92 @@ def elapsed(session: Session) -> float:
 
 
 def preview(session: Session) -> Image.Image:
-    """The upload, with the mask drawn over it when there is one."""
+    """The upload, with the mask drawn over it when there is one; while a chunked pass runs,
+    the upload with its parts tinted by state instead (the board)."""
+    board = session.board
+    if session.running == PassKind.chunked and board is not None:
+        snap = board.snapshot()
+        extent = (max(c.core[2] for c in snap.layout), max(c.core[3] for c in snap.layout))
+        return render.chunk_overlay(session.image, snap, extent)
     return render.overlay(session.image, session.result)
+
+
+def progress_line(session: Session) -> str:
+    """ "Working… 12 s", plus the parts done and the borders check for a chunked pass."""
+    line = f"Working… {elapsed(session):.0f} s"
+    board = session.board
+    if session.running == PassKind.chunked and board is not None:
+        line += f" · {board.done_count()} of {board.total} parts done"
+        if board.snapshot().review == ReviewState.reviewing:
+            line += " · checking the borders"
+    return line
+
+
+AGENT_TABLE_HEADERS = [
+    "Part",
+    "State",
+    "Time",
+    "Cost",
+    "Closer views",
+    "Walls",
+    "Doors/windows",
+    "Lights",
+]
+
+
+def _state_text(state: str, failure: str | None) -> str:
+    """ "done", "failed: timed out", "skipped: limit reached"."""
+    if failure is None:
+        return str(state)
+    reason = short_reason(failure)
+    return reason if failure == LIMIT else f"{state}: {reason}"
+
+
+def _review_text(review) -> str:
+    """The borders row's State column."""
+    if review.state == ReviewState.done:
+        removed, added = sum(review.removed.values()), sum(review.added.values())
+        return f"done: {removed} removed, {added} added"
+    if review.state == ReviewState.not_needed:
+        return "not needed (one part)"
+    return f"not checked: {short_reason(review.failure) or 'stopped'}"
+
+
+def agent_table(session: Session | None) -> list[list] | None:
+    """One row per agent and a last row for the borders check, for the last chunked result;
+    None when the result is not from a chunked pass (spec FR-019). Columns:
+    `AGENT_TABLE_HEADERS`."""
+    if session is None or session.result is None or session.result.kind != PassKind.chunked:
+        return None
+    r = session.result
+    rows = [
+        [
+            f"Part {c.part}",
+            _state_text(c.state, c.failure),
+            f"{c.seconds:.0f} s",
+            f"${c.cost_usd:.2f}",
+            c.views,
+            c.walls,
+            c.portals,
+            c.lights,
+        ]
+        for c in r.chunks
+    ]
+    if r.review is not None:
+        review = r.review
+        rows.append(
+            [
+                f"Borders ({review.model_label})",
+                _review_text(review),
+                f"{review.seconds:.0f} s",
+                f"${review.cost_usd:.2f}",
+                "",
+                "",
+                "",
+                "",
+            ]
+        )
+    return rows
 
 
 def set_extension(session: Session, extension: str) -> None:
@@ -247,8 +360,18 @@ def status_line(session: Session | None) -> str:
     if session is None or session.result is None:
         return ""
     r = session.result
-    label = session.settings.profiles[r.kind].label
-    line = f"{label} ({r.effort}) · {r.elapsed_s:.0f} s · about ${r.cost_usd:.2f} · {r.counts()}"
+    if r.kind == PassKind.chunked:
+        chunked = session.settings.chunked
+        agents = chunked.agents[r.agents]
+        orchestrator = chunked.agents[agents.orchestrator].label
+        n = len(r.chunks)
+        who = f"{n} {agents.label} agent{'' if n == 1 else 's'} + {orchestrator} orchestrator"
+        line = f"Chunked · {who} · {r.elapsed_s:.0f} s · about ${r.cost_usd:.2f} · {r.counts()}"
+    else:
+        label = session.settings.profiles[r.kind].label
+        line = (
+            f"{label} ({r.effort}) · {r.elapsed_s:.0f} s · about ${r.cost_usd:.2f} · {r.counts()}"
+        )
     return f"{line}\n{r.note}" if r.note else line
 
 
@@ -260,11 +383,37 @@ def result_message(session: Session | None) -> str:
         return message(session.last_failure.kind, has_earlier_mask=session.result is not None)
     if session.result is not None and session.result.is_empty():
         return EMPTY_MASK
+    if session.result is not None and session.result.kind == PassKind.chunked:
+        return _chunked_message(session.result)
     return ""
 
 
-def button_labels(settings: Settings) -> dict[PassKind, str]:
-    """The two pass buttons' labels, with expected time and cost from the config."""
+def _chunked_message(r: TraceResult) -> str:
+    """Untraced parts by number (spec FR-012) and/or the borders not being checked."""
+    texts = []
+    missing = [c for c in r.chunks if c.state != ChunkState.done]
+    if missing:
+        failed = [c for c in missing if c.state == ChunkState.failed]
+        failure = failed[0].failure if failed else LIMIT
+        texts.append(partial_message([c.part for c in missing], len(r.chunks), failure))
+    if r.review is not None and r.review.state in (ReviewState.failed, ReviewState.skipped):
+        texts.append(SEAMS_NOT_CHECKED)
+    return " ".join(texts)
+
+
+def button_labels(
+    settings: Settings,
+    map_size: MapSize | None = None,
+    detect: bool = False,
+    agents: AgentChoice | None = None,
+) -> dict[PassKind, str]:
+    """The three pass buttons' labels, with expected time and cost from the config.
+
+    The chunked pass's label follows the map size on screen, the detect option and the
+    selector (defaults: the config's default size and agents). With detection on it also
+    gives the most a pass can take and cost, since the detected size may need more parts
+    (spec FR-011). Figures not yet measured say "estimate".
+    """
 
     def label(name: str, kind: PassKind) -> str:
         """One button's label."""
@@ -274,7 +423,33 @@ def button_labels(settings: Settings) -> dict[PassKind, str]:
     return {
         PassKind.quick: label("Suggest walls", PassKind.quick),
         PassKind.deep: label("Deeper examination", PassKind.deep),
+        PassKind.chunked: chunked_label(settings, map_size, detect, agents),
     }
+
+
+def chunked_label(
+    settings: Settings, map_size: MapSize | None, detect: bool, agents: AgentChoice | None
+) -> str:
+    """ "Chunked pass: 4 Sonnet agents (about 45 s, about $0.29, estimate)"."""
+    chunked = settings.chunked
+    app = settings.app
+    size = map_size or MapSize(width=app.default_width, height=app.default_height)
+    agents = agents or chunked.default_agents
+    choice = chunked.agents[agents]
+    n = len(chunked.layout(size.as_tuple()))
+    seconds, cost = chunked.expected(size.as_tuple(), agents, detect, settings.size_step)
+    estimate = ", estimate" if choice.estimate else ""
+    name = choice.label.split()[0]
+    who = f"{n} {name} agent{'' if n == 1 else 's'}"
+    figures = f"(about {seconds:.0f} s, about ${cost:.2f}{estimate})"
+    if not detect:
+        return f"Chunked pass: {who} {figures}"
+    top = chunked.max_per_side**2
+    label = f"Chunked pass: {who} for {size.width} x {size.height} {figures}"
+    if n < top:
+        max_s, max_cost = chunked.expected_max(agents, True, settings.size_step)
+        label += f"; up to ${max_cost:.2f} and {max_s:.0f} s if the detected size needs {top} parts"
+    return label
 
 
 def close(session: Session | None) -> None:

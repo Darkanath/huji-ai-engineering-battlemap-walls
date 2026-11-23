@@ -77,3 +77,63 @@ def test_default_size_outside_the_limits_fails(raw):
     raw["app"]["default_width"] = 250
     with pytest.raises(ValidationError, match="default"):
         Settings.model_validate(raw)
+
+
+# --- The chunked pass's settings (feature 002) -----------------------------------------------
+
+
+def test_shipped_chunked_settings_load():
+    """All three agent choices load, paired with their orchestrators, Sonnet by default."""
+    chunked = load_settings().chunked
+    assert set(chunked.agents) == {"haiku", "sonnet", "opus"}
+    assert chunked.default_agents == "sonnet"
+    assert [chunked.agents[a].orchestrator for a in ("haiku", "sonnet", "opus")] == [
+        "sonnet",
+        "sonnet",
+        "opus",
+    ]
+    assert all(chunked.agents[a].estimate for a in chunked.agents)
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda c: c["agents"].pop("haiku"), "haiku"),
+        (lambda c: c["agents"]["opus"].update(orchestrator="fable"), "orchestrator"),
+        (lambda c: c["agents"]["haiku"].update(name="claude-unknown"), "no price"),
+        (lambda c: c.update(max_per_side=5), "max_per_side"),
+        (lambda c: c.update(overlap_squares=7), "overlap"),
+        (lambda c: c.update(core_squares=1), "core_squares"),
+    ],
+    ids=["missing-choice", "bad-orchestrator", "no-price", "too-many", "overlap", "tiny-core"],
+)
+def test_broken_chunked_settings_fail(raw, change, message):
+    """A missing choice, an orchestrator that names no entry, an unpriced model, more than 4
+    per side, an overlap of half a core or more, or a core under 2 squares is rejected."""
+    change(raw["chunked"])
+    with pytest.raises(ValidationError, match=message):
+        Settings.model_validate(raw)
+
+
+def test_expected_figures_follow_the_map_size_choice_and_detection():
+    """seconds = ceil(n / parallel) * per chunk + review (n > 1) + size step (detect);
+    cost = n * per chunk + review (n > 1) + size step (detect)."""
+    settings = load_settings()
+    chunked = settings.chunked
+    seconds, cost = chunked.expected((25, 25), "sonnet", detect=False, size_step=settings.size_step)
+    assert seconds == pytest.approx(45) and cost == pytest.approx(0.29)
+    seconds, cost = chunked.expected((25, 25), "sonnet", detect=True, size_step=settings.size_step)
+    assert seconds == pytest.approx(53) and cost == pytest.approx(0.32)
+    seconds, cost = chunked.expected((13, 13), "sonnet", detect=False, size_step=settings.size_step)
+    assert seconds == pytest.approx(25) and cost == pytest.approx(0.06)  # one chunk, no review
+    _, cost = chunked.expected((50, 50), "opus", detect=False, size_step=settings.size_step)
+    assert len(chunked.layout((50, 50))) == 16 and cost == pytest.approx(3.35)
+
+
+def test_expected_max_is_the_four_by_four_layout():
+    """The upper bound shown when detection may change the chunk count (FR-011)."""
+    settings = load_settings()
+    seconds, cost = settings.chunked.expected_max(
+        "sonnet", detect=True, size_step=settings.size_step
+    )
+    assert seconds == pytest.approx(128) and cost == pytest.approx(1.04)

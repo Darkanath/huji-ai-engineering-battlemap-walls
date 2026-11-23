@@ -6,14 +6,24 @@ import pytest
 from pydantic import ValidationError
 
 from app.domain import (
+    ChunkReport,
     MapSize,
+    MapSizeSource,
+    PassKind,
     Point,
     Portal,
     RawAnswer,
+    ReviewReport,
+    TraceResult,
+    Usage,
     answer_to_fractions,
     to_grid,
     to_pixels,
 )
+from llm.orchestrator import ChunkState
+from llm.review import ReviewState
+
+from conftest import FIXTURES
 
 
 def answer(**parts) -> RawAnswer:
@@ -81,3 +91,37 @@ def test_to_grid_round_trips_answer_to_fractions():
 def test_to_pixels_scales_by_the_image_size():
     """Fractions become pixels on the given image."""
     assert to_pixels(Point(fx=0.25, fy=0.5), (400, 200)) == (100, 100)
+
+
+def test_golden_result_still_loads_without_the_chunked_fields():
+    """A single-session result saved before the chunked pass existed loads unchanged."""
+    result = TraceResult.model_validate_json((FIXTURES / "golden_result.json").read_text())
+    assert result.chunks == [] and result.review is None and result.agents is None
+
+
+def test_a_chunked_result_round_trips_through_json():
+    """The chunked pass's reports and untraced parts survive JSON."""
+    result = TraceResult(
+        kind=PassKind.chunked,
+        model_id="claude-sonnet-5-5",
+        effort="medium",
+        elapsed_s=40.0,
+        usage=Usage(),
+        cost_usd=0.3,
+        traced_size=MapSize(width=25, height=25),
+        size_source=MapSizeSource.typed,
+        agents="sonnet",
+        orchestrator_model="claude-sonnet-5-5",
+        chunks=[
+            ChunkReport(part=1, state=ChunkState.done, walls=3),
+            ChunkReport(part=2, state=ChunkState.failed, failure="timeout"),
+        ],
+        review=ReviewReport(
+            state=ReviewState.done,
+            model_label="Sonnet 5.5",
+            removed={"walls": 1},
+            added={"walls": 2},
+        ),
+        untraced=[(Point(fx=0.5, fy=0), Point(fx=1, fy=0.5))],
+    )
+    assert TraceResult.model_validate_json(result.model_dump_json()) == result

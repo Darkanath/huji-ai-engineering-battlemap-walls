@@ -70,6 +70,74 @@ class PassFailure(BaseModel):
     detail: str = ""
 
 
+# The chunked pass (specs/002-chunked-map-tracing/contracts/app.md).
+SHORT_REASONS = {
+    FailureKind.refusal: "refused",
+    FailureKind.output_limit: "answer too long",
+    FailureKind.pass_limit: "limit reached",
+    FailureKind.rate_limit: "rate limited",
+    FailureKind.provider_busy: "service busy",
+    FailureKind.auth: "key not accepted",
+    FailureKind.missing_key: "no key",
+    FailureKind.network: "no network",
+    FailureKind.timeout: "timed out",
+    FailureKind.unreadable: "unreadable answer",
+    FailureKind.unexpected: "something went wrong",
+}
+LIMIT = "limit"  # a skipped part or review: the pass reached its time or cost limit
+WHY = {  # the reason in a partial message, in a sentence
+    FailureKind.refusal: "the model declined",
+    FailureKind.output_limit: "the answer was too long",
+    FailureKind.pass_limit: "an agent used up its allowance",
+    FailureKind.rate_limit: "the provider's rate limit was reached",
+    FailureKind.provider_busy: "the model service was busy",
+    FailureKind.auth: "the API key was not accepted",
+    FailureKind.missing_key: "no API key is set up",
+    FailureKind.network: "the AI provider could not be reached",
+    FailureKind.timeout: "it took too long",
+    FailureKind.unreadable: "the answer could not be read",
+    FailureKind.unexpected: "something went wrong",
+}
+SEAMS_NOT_CHECKED = (
+    "The borders between the parts were not checked, so walls may be broken or doubled where "
+    "the parts meet."
+)
+
+
+def short_reason(failure: str | None) -> str:
+    """A few words for the agent table: a FailureKind value, `LIMIT`, or None (no failure)."""
+    if failure is None:
+        return ""
+    if failure == LIMIT:
+        return "skipped: limit reached"
+    return SHORT_REASONS[FailureKind(failure)]
+
+
+def _parts(parts: list[int]) -> str:
+    """ "Part 3", "Parts 2 and 4", "Parts 1, 2 and 4"."""
+    names = [str(p) for p in sorted(parts)]
+    if len(names) == 1:
+        return f"Part {names[0]}"
+    return f"Parts {', '.join(names[:-1])} and {names[-1]}"
+
+
+def partial_message(parts: list[int], total: int, failure: str | None) -> str:
+    """The message for a chunked pass that traced only some parts (spec FR-012).
+
+    `parts` are the 1-based numbers shown in the preview and the table; `failure` is the
+    first failed part's FailureKind value, or `LIMIT` / None when parts were skipped.
+    """
+    if failure in (None, LIMIT):
+        why = "the pass reached its time or cost limit"
+    else:
+        why = WHY[FailureKind(failure)]
+    return (
+        f"{_parts(parts)} of {total} could not be traced ({why}). The file has everything "
+        "else; the missing parts are outlined in the preview. Run the chunked pass again to "
+        "retry the whole map."
+    )
+
+
 def message(kind: FailureKind, has_earlier_mask: bool = False) -> str:
     """The user-facing text for a failure, with a reminder when the earlier mask is kept."""
     text = MESSAGES[kind]
