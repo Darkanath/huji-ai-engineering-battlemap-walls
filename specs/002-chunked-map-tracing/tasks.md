@@ -148,7 +148,7 @@ run folders and a `summary.csv` with both sets of scores, and asks before sendin
 - [X] T039 [US3] In `llm/run.py`, add `--chunked` and `--agents haiku|sonnet|opus` (default `[chunked].default_agents`; `--model`/`--effort` override the agents' model), the chunked estimate in `confirm`, the default run folder `runs/<YYYYMMDD-HHMMSS>_chunked_<agents>/`, a `save_chunked_map` that writes the files of contracts/config-and-cli.md, and the summary row with both score sets (`score_row` on `merged` and on `answer`) and both `merge.seam_checks` results (SC-003), traced on the true map size; update the module docstring's usage lines (T038).
 - [X] T040 [US3] **(owner, paid ≈ $1.2)** Approve and run `python -m llm.run --reference --chunked --agents sonnet --run <date>_chunked_sonnet` (quickstart step 5).
 - [X] T041 [US3] **(owner, paid ≈ $0.5; 16 parts per map since 23.11)** Approve and run `python -m llm.run --reference --chunked --agents haiku --run <date>_chunked_haiku` (output in `runs/<date>_chunked_haiku/`).
-- [ ] T042 [US3] **(owner, optional, paid ≈ $3.8)** Approve and run `python -m llm.run --reference --chunked --agents opus --run <date>_chunked_opus` (output in `runs/<date>_chunked_opus/`), if the row is wanted for the slides.
+- [X] ~~T042 [US3] **(owner, optional, paid ≈ $3.8)** Approve and run `python -m llm.run --reference --chunked --agents opus --run <date>_chunked_opus` (output in `runs/<date>_chunked_opus/`), if the row is wanted for the slides.~~ **Dropped by the owner on 2026-11-23: not needed.** The Opus agents' time and cost in the config stay marked as estimates.
 - [X] T043 [US3] In `docs/results.md`, add a section "Chunked tracing · reference maps": one table per measured choice with the 13.11 reference columns plus agents, chunks and review state, the rule-merged scores beside the reviewed ones, run names, costs, sample size (one run per map), known weaknesses (one run per cell, 25x25 maps only, research.md R1), and the comparison with the 13.11 single-session rows against SC-001, SC-002, SC-003 (seam gaps and duplicates per map), SC-004, SC-005 and SC-009.
 - [X] T044 [US3] In `llm/configs/claude.toml`, set each measured choice's `expected_seconds_per_chunk`, `expected_cost_per_chunk_usd` and the review's `expected_seconds` / `expected_cost_usd` from the measured means, set `estimate = false` for those choices, and replace their ESTIMATE comments with "measured <date> (docs/results.md)".
 
@@ -192,7 +192,7 @@ T032 → T033 (needs T028); T034 → T035 (needs T031, T033); T036 (needs T035) 
 
 ### Within US3
 
-T038 → T039 → T040 → T041 → T042 (optional) → T043 → T044.
+T038 → T039 → T040 → T041 → T043 → T044 (T042 dropped).
 
 ## Parallel Opportunities
 
