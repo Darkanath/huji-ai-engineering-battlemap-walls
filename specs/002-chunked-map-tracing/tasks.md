@@ -235,3 +235,12 @@ Keep: T001-T024, US2, T038-T040, T043-T045. Drop in this order: T042 (Opus run),
 owner to amend FR-020 first (plan.md, Delivery order). The orchestrator is wired so the pass
 still works without a review (`review.state = skipped`, "borders not checked"), which keeps
 that option open.
+
+## Phase 7: Convergence
+
+- [X] T050 CRITICAL: In `tests/test_app_tracer.py`, test that a chunk agent stopped by its own turn or cost limit with no submission reports failure `pass_limit`, and one that finishes without ever submitting reports `unreadable`; and the same two for the seam review (`review.failure`), each giving a `TraceResult`, never an exception, per Constitution IV / FR-012 (missing)
+- [X] T051 In `llm/orchestrator.py` (`trace_chunks`), cap the seam review's cost at the whole-map budget still left (the choice's `max_cost_usd` minus what the agents spent), by passing `min([chunked.review].max_cost_usd, remaining)` to `review_seams` through `cfg["review"]`; test in `tests/test_llm_orchestrator.py` that a review cannot take the pass past `max_cost_usd`, per FR-020 / FR-010 (partial)
+- [X] T052 In `app/tracer.py`, log the merge's dropped duplicates in `pass_finished` (`portals_dropped` and `lights_dropped` as totals from `MergeReport`), add both names to `ALLOWED` in `app/logging.py`, and assert them in the chunked logging test in `tests/test_app_tracer.py`, per FR-013 (partial)
+- [X] T053 Count the map-size step's cost toward the chunked pass's whole-map limit: give `llm/orchestrator.trace_chunks` an optional `spent_before: float = 0.0` added to `spent()`, pass the size step's cost from `app/tracer.py` and `llm/run.py`, and test that a size step that used the budget skips every chunk, per FR-010 (partial)
+- [X] T054 Read the chunked pass's default agents choice from config instead of a literal: in `llm/run.py` replace `load_chunked_config("sonnet")["chunked"]["default_agents"]` with a small `default_agents()` in `llm/orchestrator.py` that reads `[chunked].default_agents`, and in `app/service.py` give `Session.agents` no hard-coded `"sonnet"` (set only by `prepare`); test `default_agents()` in `tests/test_llm_orchestrator.py`, per plan: defaults live in config (partial)
+- [X] T055 In `tests/test_llm_merge.py`, test that the merge keeps a door gap open next to a seam: a wall with a door gap just left of x = 12.5 and one straddling it (traced by both neighbours) comes out with no wall across the door, per FR-008 (partial)

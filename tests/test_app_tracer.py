@@ -8,6 +8,7 @@ import httpx2
 import pytest
 from PIL import Image
 
+from app import tracer as tracer_module
 from app.config import load_settings
 from app.domain import ChunkReport, MapSize, MapSizeSource, PassKind, TraceResult
 from app.errors import LIMIT, FailureKind, PassFailure
@@ -355,6 +356,7 @@ def test_chunked_pass_returns_the_merged_mask_with_reports(big_image, settings, 
     assert any(e["event"] == "review_finished" for e in events)
     final = [e for e in events if e["event"] == "pass_finished"][0]
     assert final["profile"] == "chunked" and final["chunks"] == 4 and final["agents"] == "sonnet"
+    assert final["portals_dropped"] == 0 and final["lights_dropped"] == 0  # FR-013
 
 
 def test_one_failed_part_gives_a_partial_result(big_image, settings):
@@ -448,3 +450,58 @@ def test_a_skipped_review_says_limit(big_image, settings, monkeypatch):
     result = chunked(big_image, settings, routes())
     assert isinstance(result, TraceResult)
     assert result.review.state == ReviewState.skipped and result.review.failure == LIMIT
+
+
+def with_limits(monkeypatch, agent_turns: int = 16, **review):
+    """Give every chunk agent `agent_turns` turns and change the review's limits."""
+    original = tracer_module.load_chunked_config
+
+    def tight(agents):
+        """The shipped config with the agents' turn limit and the review's limits changed."""
+        cfg = original(agents)
+        cfg["limits"]["max_turns"] = agent_turns
+        cfg["review"].update(review)
+        return cfg
+
+    monkeypatch.setattr(tracer_module, "load_chunked_config", tight)
+
+
+def test_a_part_stopped_by_its_own_limit_reports_pass_limit(big_image, settings, monkeypatch):
+    """Constitution IV: a chunk agent that hits its turn limit before submitting fails with
+    pass_limit; the pass still returns its other parts."""
+    with_limits(monkeypatch, agent_turns=1)
+    view = {"x0": 1, "y0": 1, "x1": 4, "y1": 4, "overlay": False}
+    client = routes(c3=[reply(call("view_region", view))])
+    client.routes[span(WINDOWS[0])] = [reply(call("submit_answer", chunk_answer(LEFT_WALL)))]
+    result = chunked(big_image, settings, client)
+    assert isinstance(result, TraceResult)
+    assert result.chunks[3].state == ChunkState.failed
+    assert result.chunks[3].failure == FailureKind.pass_limit.value
+
+
+def test_a_part_that_never_submits_reports_unreadable(big_image, settings):
+    """Constitution IV: a chunk agent that finishes twice without a submission fails with
+    unreadable."""
+    silent = [reply(text("Looks empty."), stop="end_turn")] * 2
+    result = chunked(big_image, settings, routes(c2=silent))
+    assert isinstance(result, TraceResult)
+    assert result.chunks[2].state == ChunkState.failed
+    assert result.chunks[2].failure == FailureKind.unreadable.value
+
+
+def test_a_review_stopped_by_its_limit_reports_pass_limit(big_image, settings, monkeypatch):
+    """The review's own turn limit, with no submission: failed with pass_limit; merged mask
+    kept."""
+    with_limits(monkeypatch, max_turns=1)
+    view = {"x0": 12, "y0": 1, "x1": 13, "y1": 5, "overlay": False}
+    result = chunked(big_image, settings, routes(review=[reply(call("view_region", view))]))
+    assert isinstance(result, TraceResult) and len(result.walls) == 1
+    assert result.review.state == ReviewState.failed
+    assert result.review.failure == FailureKind.pass_limit.value
+
+
+def test_a_review_that_never_submits_reports_unreadable(big_image, settings):
+    """The review finishes twice without a submission: failed with unreadable."""
+    result = chunked(big_image, settings, routes())
+    assert result.review.state == ReviewState.failed
+    assert result.review.failure == FailureKind.unreadable.value

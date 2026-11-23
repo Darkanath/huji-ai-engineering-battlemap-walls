@@ -67,7 +67,7 @@ class Session:
     export_key: tuple | None = None
     export_path: Path | None = None
     # The chunked pass: the selector's value, and the live board while that pass runs.
-    agents: AgentChoice = "sonnet"
+    agents: AgentChoice | None = None  # set from [chunked].default_agents by prepare()
     board: ChunkBoard | None = None
 
 

@@ -345,6 +345,7 @@ def _chunked_pass(
             client,
             deadline=deadline,
             on_update=board.on_update if board is not None else None,
+            spent_before=size_trace.cost_usd,
         )
         traces += [r.trace for r in result.runs] + [result.review.trace]
         _log_chunked(result, cfg)
@@ -418,6 +419,8 @@ def _chunked_pass(
             joins=merge.joins if merge else 0,
             ends_snapped=merge.ends_snapped if merge else 0,
             pieces_dropped=merge.pieces_dropped if merge else 0,
+            portals_dropped=sum(merge.portals_dropped) if merge else 0,
+            lights_dropped=sum(merge.lights_dropped) if merge else 0,
             walls=len(walls),
             portals=len(portals),
             lights=len(lights),

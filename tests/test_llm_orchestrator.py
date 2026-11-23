@@ -9,7 +9,13 @@ import pytest
 from PIL import Image
 
 from data.rasterize import decode_image, load_uvtt
-from llm.orchestrator import ChunkState, chunk_layout, load_chunked_config, trace_chunks
+from llm.orchestrator import (
+    ChunkState,
+    chunk_layout,
+    default_agents,
+    load_chunked_config,
+    trace_chunks,
+)
 from llm.review import ReviewState
 from postprocess.uvtt import answer_to_uvtt, write_uvtt
 
@@ -271,3 +277,30 @@ def test_four_agents_give_one_valid_file(tmp_path):
     (wall,) = uvtt["line_of_sight"]
     assert wall[0] == {"x": 3, "y": 5} and wall[-1] == {"x": 22, "y": 5}
     assert len(uvtt["portals"]) == 1 and len(uvtt["lights"]) == 1
+
+
+def test_the_review_cannot_take_the_pass_past_its_cost_limit():
+    """FR-020 / FR-010: the review gets only the whole-map budget the agents left. Four agents
+    cost 4 x $0.006; with a $0.0265 limit the review may make one $0.003 request, then stops."""
+    view = {"x0": 12, "y0": 1, "x1": 13, "y1": 5, "overlay": False}
+    client = four_agents([reply(call("view_region", view))] * 5)
+    result = trace_chunks(demo_image(), (25, 25), config(max_cost_usd=0.0265), client)
+    assert result.review.trace.turns == 1
+    assert result.review.trace.stopped == "cost limit"
+    assert result.cost_usd == pytest.approx(0.027)
+
+
+def test_cost_spent_before_the_agents_counts_toward_the_limit():
+    """FR-010: a size step that used the whole budget leaves nothing for the agents."""
+    client = four_agents()
+    result = trace_chunks(
+        demo_image(), (25, 25), config(max_cost_usd=0.03), client, spent_before=0.03
+    )
+    assert [r.state for r in result.runs] == [ChunkState.skipped] * 4
+    assert client.requests == {}
+    assert result.cost_usd == 0  # the orchestrator's own spend; the caller adds the size step
+
+
+def test_default_agents_comes_from_the_config():
+    """The selector's default is [chunked].default_agents, not a literal in code."""
+    assert default_agents() == "sonnet"

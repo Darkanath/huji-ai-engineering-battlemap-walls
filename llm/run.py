@@ -37,7 +37,13 @@ from data.rasterize import JPEG_QUALITY, decode_image, load_uvtt, overlay, raste
 from eval.metrics import portal_recall, score
 from llm.agent import Trace, detect_map_size, load_config, size_step_config, trace_map
 from llm.merge import chunk_layout, seam_checks
-from llm.orchestrator import ChunkedTrace, ChunkState, load_chunked_config, trace_chunks
+from llm.orchestrator import (
+    ChunkedTrace,
+    ChunkState,
+    default_agents,
+    load_chunked_config,
+    trace_chunks,
+)
 from postprocess.uvtt import answer_to_uvtt, write_uvtt
 
 SCORE_KEYS = ("iou_wall", "boundary_f1_wall", "iou_portal", "iou_light")
@@ -315,7 +321,7 @@ def main(argv: list[str] | None = None) -> None:
     args = ap.parse_args(argv)
 
     if args.chunked:
-        args.agents = args.agents or load_chunked_config("sonnet")["chunked"]["default_agents"]
+        args.agents = args.agents or default_agents()
         cfg = load_chunked_config(args.agents)
     else:
         cfg = load_config(args.profile)
@@ -385,7 +391,9 @@ def main(argv: list[str] | None = None) -> None:
             continue
         if args.chunked:
             # Traced and scored on the true size, like the single session.
-            result = trace_chunks(job.image, job.size, cfg, client, out_dir=out)
+            result = trace_chunks(
+                job.image, job.size, cfg, client, out_dir=out, spent_before=trace.cost_usd
+            )
             seconds = time.time() - start
             uvtt = save_chunked_map(out, job, result, trace, seconds)
             row = chunked_row(job, cfg, result, trace, seconds, uvtt)

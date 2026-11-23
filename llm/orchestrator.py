@@ -37,6 +37,7 @@ __all__ = [
     "ChunkState",
     "ChunkedTrace",
     "chunk_layout",
+    "default_agents",
     "load_chunked_config",
     "trace_chunks",
 ]
@@ -47,6 +48,11 @@ MODEL_KEYS = ("name", "label", "effort", "max_tokens", "fallbacks")  # what the 
 def _model(entry: dict) -> dict:
     """The model fields of one `[chunked.agents.*]` entry, in the form `cfg["model"]` takes."""
     return {key: entry[key] for key in MODEL_KEYS}
+
+
+def default_agents(path: Path = CONFIG) -> str:
+    """The selector's default choice, `[chunked].default_agents`."""
+    return tomllib.loads(Path(path).read_text())["chunked"]["default_agents"]
 
 
 def load_chunked_config(agents: str, path: Path = CONFIG) -> dict:
@@ -147,6 +153,7 @@ def trace_chunks(
     deadline: float | None = None,
     on_update: Update | None = None,
     out_dir: Path | None = None,
+    spent_before: float = 0.0,
 ) -> ChunkedTrace:
     """Run a chunked pass: agents on every chunk at the same time, merge, seam review.
 
@@ -156,8 +163,11 @@ def trace_chunks(
     `max_cost_usd`. `on_update(kind, index, state)` is told every change ("chunk" with the
     chunk's index, or "review" with None); it is called from worker threads, and anything it
     raises is ignored. With `out_dir`, the images every agent and the reviewer saw are saved
-    under `chunks/<i>/views/` and `review/views/`. Never raises for an agent's or the
-    review's failure: those end in the runs' states.
+    under `chunks/<i>/views/` and `review/views/`. `spent_before` is what the pass already
+    spent (the map-size step); it counts toward the cost limit but not toward the result's
+    `cost_usd`, which is the agents' and the review's. The review gets only the budget the
+    agents left. Never raises for an agent's or the review's failure: those end in the runs'
+    states.
     """
     start = time.monotonic()
     settings = cfg["chunked"]
@@ -176,9 +186,13 @@ def trace_chunks(
             except Exception:  # noqa: BLE001 - a page callback must not break the pass
                 pass
 
-    def spent() -> float:
+    def agents_spent() -> float:
         """What the agents have cost so far (their traces update while they run)."""
         return sum(r.trace.cost_usd for r in runs)
+
+    def spent() -> float:
+        """What the pass has cost so far, counting what was spent before the agents."""
+        return spent_before + agents_spent()
 
     def out_of_budget() -> bool:
         """Whether the deadline has passed or the agents have cost the limit."""
@@ -228,8 +242,16 @@ def trace_chunks(
         else:
             notify("review", None, ReviewState.reviewing)
             views = out_dir / "review" / "views" if out_dir else None
+            left = settings["max_cost_usd"] - spent()
+            review_cfg = {
+                **cfg,
+                "review": {
+                    **cfg["review"],
+                    "max_cost_usd": min(cfg["review"]["max_cost_usd"], left),
+                },
+            }
             result.review = review_seams(
-                image, map_size, result.merged, seam_list, cfg, client, deadline, views
+                image, map_size, result.merged, seam_list, review_cfg, client, deadline, views
             )
             if result.review.state == ReviewState.done:
                 strips = [s.strip for s in seam_list]
@@ -242,6 +264,6 @@ def trace_chunks(
                     min_piece,
                 )
         notify("review", None, result.review.state)
-    result.cost_usd = spent() + result.review.trace.cost_usd
+    result.cost_usd = agents_spent() + result.review.trace.cost_usd
     result.seconds = time.monotonic() - start
     return result

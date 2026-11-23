@@ -419,3 +419,41 @@ def test_seam_checks_count_gaps_and_duplicates():
     }
     checks = seam_checks(answer, found, gap=0.1, same=0.5)
     assert checks == {"seam_gap_ends": 2, "duplicate_portals": 1, "duplicate_lights": 0}
+
+
+def covered(answer: dict, y: float, x0: float, x1: float) -> bool:
+    """Whether any horizontal wall at height `y` runs over part of the open interval x0..x1."""
+    for line in points_of(answer):
+        for (ax, ay), (bx, by) in zip(line, line[1:], strict=False):
+            if abs(ay - y) < 1e-6 and abs(by - y) < 1e-6:
+                lo, hi = sorted((ax, bx))
+                if hi > x0 + 1e-6 and lo < x1 - 1e-6:
+                    return True
+    return False
+
+
+def test_a_door_gap_just_beside_a_seam_stays_open():
+    """FR-008: a door from 11.6 to 12.4 (left of x = 12.5), traced by both neighbours, keeps
+    its gap; the wall to its right is joined across the seam; the door comes out once."""
+    chunks = layout()
+    door = {"x1": 11.6, "y1": 6, "x2": 12.4, "y2": 6}
+    left, right = wall((3, 6), (11.6, 6)), wall((12.4, 6), (22, 6))
+    answers = {
+        0: {"walls": [left, wall((12.4, 6), (13.5, 6))], "portals": [door]},
+        1: {"walls": [wall((11.5, 6), (11.6, 6)), right], "portals": [door]},
+    }
+    merged, _ = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
+    assert not covered(merged, 6, 11.6, 12.4)
+    assert merged["portals"] == [door]
+    assert [(12.4, 6), (12.5, 6), (22, 6)] in points_of(merged)
+
+
+def test_a_door_straddling_a_seam_stays_open():
+    """A door across x = 12.5 keeps its gap and is kept once, by the part owning its middle."""
+    chunks = layout()
+    door = {"x1": 12.2, "y1": 6, "x2": 12.8, "y2": 6}
+    walls = [wall((3, 6), (12.2, 6)), wall((12.8, 6), (22, 6))]
+    answers = {0: {"walls": walls, "portals": [door]}, 1: {"walls": walls, "portals": [door]}}
+    merged, report = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
+    assert not covered(merged, 6, 12.2, 12.8)
+    assert merged["portals"] == [door] and report.portals_kept == [0, 1, 0, 0]
