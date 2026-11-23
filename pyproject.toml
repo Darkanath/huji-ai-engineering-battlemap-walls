@@ -20,7 +20,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest", "ruff"]
+dev = [
+    "matplotlib>=3.11.2",  # 2026-11-23: results figures (eval/figures.py), approved by the owner
+    "pytest",
+    "ruff",
+]
 
 [tool.uv]
 # The project runs only in the Linux container, so the lockfile resolves for Linux alone.
