@@ -6,6 +6,7 @@ compatibility: "Requires spec-kit project structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/constitution.md"
+  version: "1.4.4"
 user-invocable: true
 disable-model-invocation: false
 ---
@@ -82,7 +83,7 @@ preset/template resolution stack.
 
 Follow this execution flow:
 
-1. Run `python3 .specify/scripts/python/resolve_template.py constitution-template --json` from the repository root and parse `TEMPLATE_CONTENT` as the active template.
+1. Run `.venv/bin/python .specify/scripts/python/resolve_template.py constitution-template --json` from the repository root and parse `TEMPLATE_CONTENT` as the active template.
    - The shared resolver applies project overrides, composing preset layers, and extension layers
      before the core template fallback. It MUST succeed before continuing.
    - If it fails, stop and report the resolution error; do not continue with only one contributing
