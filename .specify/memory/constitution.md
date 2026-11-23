@@ -111,8 +111,14 @@ too small.
   cliffs). Portal = a door or window in a wall; an open gap with no door stays a gap.
   Furniture, counters, rugs, trees, boulders and water are not walls. Light = a lit light
   source drawn in the image. Full rules: `docs/labeling-rules.md`.
-- **Models:** two profiles in configuration: a fast default (Sonnet) and a deep pass (Opus).
-  Measured expectations for each are kept in `docs/results.md` and shown in the UI.
+- **Models:** two single-session profiles in configuration: a fast default (Sonnet) and a
+  deep pass (Opus). The chunked pass (`specs/002-chunked-map-tracing/`) is the one place a
+  third model is offered: the user picks Haiku, Sonnet or Opus for its tracing agents, and the
+  orchestrator model that reviews the seams follows from that choice (Sonnet for Haiku or
+  Sonnet agents, Opus for Opus agents). The models, their pairing and their expected time and
+  cost live in configuration. Each choice offered in the UI MUST have measured expectations
+  in `docs/results.md` before its figures stop being marked as estimates, and those figures
+  are shown in the UI.
 - **Maps:** no more real maps are made, except when testing needs one.
 - **Storage:** map images and previews are JPEG (quality 90). Masks are always PNG. Datasets,
   runs and third-party test maps stay out of git.
@@ -148,4 +154,4 @@ too small.
   tasks. A plan that breaks a principle MUST say which one, why, and what simpler option was
   rejected; otherwise the plan is changed.
 
-**Version**: 2.0.0 | **Ratified**: 2026-11-13 | **Last Amended**: 2026-11-13
+**Version**: 2.1.0 | **Ratified**: 2026-11-13 | **Last Amended**: 2026-11-23

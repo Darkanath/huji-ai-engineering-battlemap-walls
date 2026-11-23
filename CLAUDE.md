@@ -94,6 +94,14 @@ and the map-size step (one to three runs per map; `docs/results.md`, 13.11):
   `[size_step]` names the profile whose model works out the map size: `deep` (Opus) in both
   passes, because Sonnet got it right on 1 of 3 grid maps and Opus on 3 of 3. Re-measure with
   `python -m llm.run --reference --detect-size` (paid, ask first).
+- **Chunked pass** (planned, `specs/002-chunked-map-tracing/`; constitution 2.1.0): the map is
+  split into up to 4 x 4 overlapping chunks, each traced by its own agent at the same time; the
+  answers are merged by fixed rules, then an orchestrator model reviews only the strips along
+  the borders between chunks. A selector next to the button picks the agents' model: Haiku,
+  Sonnet (default) or Opus. The orchestrator model follows from it: Sonnet for Haiku or Sonnet
+  agents, Opus for Opus agents. This is the only place Haiku is offered in the app. Its
+  expected time and cost are estimates, marked as such in the config, until measured with
+  `python -m llm.run --reference --chunked` (paid, ask first) and recorded in `docs/results.md`.
 
 ## Repo layout
 
