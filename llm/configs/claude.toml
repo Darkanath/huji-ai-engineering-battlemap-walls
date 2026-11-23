@@ -32,6 +32,7 @@ expected_cost_usd = 0.32
 [size_step]
 profile = "deep"
 expected_cost_usd = 0.03     # one Opus request, for llm.run --size-only
+expected_seconds = 8         # one request; used only in the chunked pass's button figures
 
 [limits]
 max_turns = 24             # API calls per map
@@ -84,3 +85,74 @@ export_jpeg_quality = 90
 # "Detect map size from the image" starts off: detection adds about $0.03 (one Opus request)
 # to a pass and missed on a map with a faint grid (docs/results.md, 13.11). The user ticks it.
 detect_size_default = false
+
+# The chunked pass (specs/002-chunked-map-tracing/): the map is split into up to 4 x 4 chunks,
+# each traced by its own agent at the same time; the answers are merged by fixed rules, then an
+# orchestrator model reviews the strips along the borders between chunks. The user picks the
+# agents' model; the orchestrator's follows from it (constitution 2.1.0).
+[chunked]
+default_agents = "sonnet"
+core_squares = 13          # largest side of a chunk's own area; sides are split evenly
+overlap_squares = 1        # each chunk also sees and traces this far into its neighbours
+max_per_side = 4           # at most 4 x 4 = 16 chunks; larger maps get larger chunks
+max_parallel = 4           # agents running at the same time
+
+# One entry per selector choice. ESTIMATE figures are replaced after the measured run
+# (research.md R5, R13); `estimate = false` then drops the "estimate" word on the button.
+[chunked.agents.haiku]
+name = "claude-haiku-5-5"
+label = "Haiku 5.5"
+effort = "medium"
+max_tokens = 16000
+fallbacks = false                   # not offered for Haiku
+orchestrator = "sonnet"
+deadline_s = 180                    # the whole pass
+max_cost_usd = 1.0                  # the whole map; chunks not started yet are skipped past it
+expected_seconds_per_chunk = 30     # ESTIMATE
+expected_cost_per_chunk_usd = 0.005 # ESTIMATE
+estimate = true
+
+[chunked.agents.sonnet]
+name = "claude-sonnet-5-5"
+label = "Sonnet 5.5"
+effort = "medium"
+max_tokens = 16000
+fallbacks = true
+orchestrator = "sonnet"
+deadline_s = 180
+max_cost_usd = 2.5
+expected_seconds_per_chunk = 25     # ESTIMATE
+expected_cost_per_chunk_usd = 0.06  # ESTIMATE
+estimate = true
+
+[chunked.agents.opus]
+name = "claude-opus-5-5"
+label = "Opus 5.5"
+effort = "medium"
+max_tokens = 16000
+fallbacks = true
+orchestrator = "opus"
+deadline_s = 420
+max_cost_usd = 6.0
+expected_seconds_per_chunk = 60     # ESTIMATE
+expected_cost_per_chunk_usd = 0.20  # ESTIMATE
+estimate = true
+
+[chunked.limits]                    # per chunk agent; the single session's [limits] are unchanged
+max_turns = 16
+max_views = 8
+max_submissions = 2
+max_cost_usd = 0.75
+
+[chunked.review]                    # the orchestrator's seam review
+strip_squares = 1.0                 # it may change lines within this distance of a seam
+max_turns = 10
+max_views = 6
+max_submissions = 2
+max_cost_usd = 0.75
+expected_seconds = { sonnet = 20, opus = 45 }        # ESTIMATE, by orchestrator
+expected_cost_usd = { sonnet = 0.05, opus = 0.15 }   # ESTIMATE, by orchestrator
+
+[chunked.merge]
+join_tolerance_squares = 0.3        # wall ends on a seam closer than this are joined
+min_piece_squares = 0.05            # clipped wall pieces shorter than this are dropped

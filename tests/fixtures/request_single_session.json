@@ -1,0 +1,241 @@
+{
+ "system": "You trace battlemaps for virtual tabletops. Given a top-down map image, you return its walls, portals and light sources as coordinates, which become line-of-sight data for dynamic lighting and fog of war in Roll20. A wall that is missing, or a gap that should not be there, lets players see into rooms they have not entered, so completeness and position both matter.\n\n## Coordinates\nAll coordinates are in grid squares, as decimals. The origin is the map's top-left corner, x grows to the right and y grows down. Every image you receive has the square numbers in its top and left margins, short ticks every half square, and thin grid lines on whole squares (cyan for x, magenta for y). Read positions off those; aim for an error under 0.1 square.\n\n## What to mark\n- Wall: anything that blocks both sight and movement: building walls, palisades, cave walls, cliff faces. Trace the centerline of the drawn wall. For caves, follow the middle of the rock border between floor and solid rock, with a point about every square, closer on tight bends.\n- Portal: a door or a window in a wall, as one segment from end to end. The wall must stop at both ends of the portal: do not draw a wall through it. An open gap or archway with no door drawn in it is just a gap: no wall and no portal there.\n- Light: a lit light source drawn in the image, at its center. Tier \"small\" for a candle, torch or wall sconce; \"medium\" for a lantern, brazier, campfire or fireplace; \"large\" for a bonfire, large fire pit or forge. Unlit fixtures and glow without a visible source are not lights.\n- Not walls: furniture, counters, rugs, stages, crates, trees, boulders, water, fences and railings low enough to see over, floor patterns, rails, and the map's own border.\n\nMany buildings sit on the grid, so wall centerlines often fall on whole or half squares; use that when the image supports it, and do not force it when it does not. Round rooms and towers are best given as arcs. Walls that meet should share the same end point.\n\n## How to work\nYou first get the whole map, then its four quarters at higher zoom (they overlap by one square). The whole map is for understanding the layout; read positions from the quarters. They are still too coarse for small things: use view_region for a closer crop wherever a door, a window, a wall end or a light needs it, and along every wall that might hold doors or windows. You can ask for several regions in one turn. Then call submit_answer with the complete answer. It returns your answer drawn over the map; compare it with the drawing, look closer at anything doubtful with view_region (overlay=true shows your lines on the crop), and submit a corrected, complete answer if needed. The last submission is the result. When it is right, reply with one short sentence saying so, plus anything you were unsure about.\n\nView and submission counts are limited, so plan them: a handful of views that cover the structure, rather than many tiny ones.",
+ "tools": [
+  {
+   "name": "view_region",
+   "description": "Return a zoomed crop of the map with the labeled grid. Give the window in grid squares. Smaller windows are shown at higher zoom; a window 6 to 10 squares wide is usually sharp enough to place doors. Set overlay to true to draw your latest submitted answer on the crop.",
+   "strict": true,
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "x0": {
+      "type": "number"
+     },
+     "y0": {
+      "type": "number"
+     },
+     "x1": {
+      "type": "number"
+     },
+     "y1": {
+      "type": "number"
+     },
+     "overlay": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "x0",
+     "y0",
+     "x1",
+     "y1",
+     "overlay"
+    ],
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "submit_answer",
+   "description": "Submit the complete answer for the whole map (it replaces any earlier submission) and get it back drawn over the map: walls red, portals magenta, lights yellow. Arc angles are in degrees, measured at the center from the +x direction (east) toward +y (south), so east is 0, south 90, west 180 and north 270; an arc runs from start_deg to end_deg, and end_deg may exceed 360.",
+   "strict": true,
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "walls": {
+      "type": "array",
+      "description": "Polylines along wall centerlines.",
+      "items": {
+       "type": "object",
+       "properties": {
+        "points": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "x": {
+            "type": "number"
+           },
+           "y": {
+            "type": "number"
+           }
+          },
+          "required": [
+           "x",
+           "y"
+          ],
+          "additionalProperties": false
+         }
+        }
+       },
+       "required": [
+        "points"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "arcs": {
+      "type": "array",
+      "description": "Circular wall pieces, for round rooms and towers.",
+      "items": {
+       "type": "object",
+       "properties": {
+        "cx": {
+         "type": "number"
+        },
+        "cy": {
+         "type": "number"
+        },
+        "r": {
+         "type": "number"
+        },
+        "start_deg": {
+         "type": "number"
+        },
+        "end_deg": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "cx",
+        "cy",
+        "r",
+        "start_deg",
+        "end_deg"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "portals": {
+      "type": "array",
+      "description": "Doors and windows, each as a segment between its two ends.",
+      "items": {
+       "type": "object",
+       "properties": {
+        "x1": {
+         "type": "number"
+        },
+        "y1": {
+         "type": "number"
+        },
+        "x2": {
+         "type": "number"
+        },
+        "y2": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "x1",
+        "y1",
+        "x2",
+        "y2"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "lights": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "x": {
+         "type": "number"
+        },
+        "y": {
+         "type": "number"
+        },
+        "tier": {
+         "type": "string",
+         "enum": [
+          "small",
+          "medium",
+          "large"
+         ]
+        }
+       },
+       "required": [
+        "x",
+        "y",
+        "tier"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "required": [
+     "walls",
+     "arcs",
+     "portals",
+     "lights"
+    ],
+    "additionalProperties": false
+   }
+  }
+ ],
+ "first_message": [
+  {
+   "type": "text",
+   "text": "The whole map:"
+  },
+  {
+   "type": "image",
+   "size": [
+    1326,
+    1326
+   ],
+   "sha256": "50d59a8d77d3100ed21fe94911614bec0168feaa64a802b186a84e510f78e47f"
+  },
+  {
+   "type": "text",
+   "text": "Squares x 0 to 13, y 0 to 13:"
+  },
+  {
+   "type": "image",
+   "size": [
+    1326,
+    1326
+   ],
+   "sha256": "530fd956f9fcc59d35888b48ae2870ab0b6e4603caba8b21c22ed31daa2498e1"
+  },
+  {
+   "type": "text",
+   "text": "Squares x 12 to 25, y 0 to 13:"
+  },
+  {
+   "type": "image",
+   "size": [
+    1326,
+    1326
+   ],
+   "sha256": "721dba5272a2f6e7b840c0cc29cfae4d82747782c6843ecfd3e847305685fd92"
+  },
+  {
+   "type": "text",
+   "text": "Squares x 0 to 13, y 12 to 25:"
+  },
+  {
+   "type": "image",
+   "size": [
+    1326,
+    1326
+   ],
+   "sha256": "d1a5e54dca9dbf8515f8b4ca38bb5f006f535823e64a1eae30a7773462688182"
+  },
+  {
+   "type": "text",
+   "text": "Squares x 12 to 25, y 12 to 25:"
+  },
+  {
+   "type": "image",
+   "size": [
+    1326,
+    1326
+   ],
+   "sha256": "440be8ab2ffc45093efc220f63037c6f380a46a3ab703ae0008368e17d2d2087"
+  },
+  {
+   "type": "text",
+   "text": "Trace this map. It is 25 squares wide and 25 squares high."
+  }
+ ]
+}

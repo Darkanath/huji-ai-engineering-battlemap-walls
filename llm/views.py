@@ -12,6 +12,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 MARGIN = 26  # px, room for the square numbers on the top and left
 WALL_RGB, PORTAL_RGB, LIGHT_RGB = (255, 40, 40), (255, 0, 255), (255, 210, 0)
+OUTLINE_RGB = (0, 230, 0)  # a chunk agent's window on the overview; no answer uses green
+STRIP_RGBA = (255, 160, 0, 70)  # a seam strip under review: translucent amber
 
 Box = tuple[float, float, float, float]  # x0, y0, x1, y1 in grid squares
 
@@ -38,13 +40,18 @@ def render_view(
     max_px: int = 1300,
     max_zoom: float = 160,
     uvtt: dict | None = None,
+    outline: Box | None = None,
+    strips: list[Box] | None = None,
 ) -> tuple[Image.Image, float]:
     """Crop `box` (grid squares) from the map, zoom it and add the labeled grid.
 
     `ppg` is the map image's pixels per square. The crop is scaled so its longest side is at
     most `max_px`, and never beyond `max_zoom` px per square. With `uvtt`, its walls (red),
-    portals (magenta) and lights (yellow rings) are drawn on top. Returns the image and the
-    zoom used, in px per square.
+    portals (magenta) and lights (yellow rings) are drawn on top. `strips` (boxes in grid
+    squares) are tinted amber under everything, for the seam review; `outline` (a box in grid
+    squares) is drawn as a thick green rectangle on top, for a chunk agent's overview. Both
+    default to None, which draws exactly what the function drew before they existed. Returns
+    the image and the zoom used, in px per square.
     """
     x0, y0, x1, y1 = clamp_box(box, (image.width / ppg, image.height / ppg))
     zoom = min(max_zoom, max_px / max(x1 - x0, y1 - y0))
@@ -57,11 +64,21 @@ def render_view(
     draw = ImageDraw.Draw(canvas, "RGBA")
 
     def px(x: float, y: float) -> tuple[float, float]:
+        """A point in grid squares as pixels on the canvas."""
         return MARGIN + (x - x0) * zoom, MARGIN + (y - y0) * zoom
 
+    for sx0, sy0, sx1, sy1 in strips or []:
+        draw.rectangle([px(sx0, sy0), px(sx1, sy1)], fill=STRIP_RGBA)
     _draw_grid(draw, canvas.size, (x0, y0, x1, y1), zoom)
     if uvtt is not None:
         _draw_answer(draw, uvtt, px, zoom)
+    if outline is not None:
+        width = max(3, round(zoom * 0.12))
+        draw.rectangle(
+            [px(outline[0], outline[1]), px(outline[2], outline[3])],
+            outline=OUTLINE_RGB,
+            width=width,
+        )
     return canvas, zoom
 
 

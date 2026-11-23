@@ -2,6 +2,7 @@
 and app test uses instead of a paid call."""
 
 import json
+import threading
 from pathlib import Path
 from types import SimpleNamespace as NS
 
@@ -74,3 +75,53 @@ def load_responses(path: Path) -> list[NS]:
         )
         for r in json.loads(Path(path).read_text())
     ]
+
+
+def span(box) -> str:
+    """ "x 0 to 13.5, y 0 to 13.5": how a chunk agent's intro names its window."""
+    return f"x {box[0]:g} to {box[2]:g}, y {box[1]:g} to {box[3]:g}"
+
+
+class RoutingFake:
+    """A fake client for the chunked pass, safe to call from several threads.
+
+    Agents run at the same time, so one shared script would be consumed in an unpredictable
+    order. Here each agent has its own script, picked by the window its first request names
+    ("Your part is x 0 to 13.5, …"), and the seam review has the script under "review".
+    A conversation keeps its route for every later request. Missing routes answer with an
+    empty finish, so a test only scripts the agents it cares about. `requests` keeps every
+    request per route. `FakeClient` is unchanged.
+    """
+
+    def __init__(self, routes: dict):
+        """`routes` maps a window span (see `span`) or "review" to a list of responses."""
+        self.routes = {key: list(script) for key, script in routes.items()}
+        self.requests: dict[str, list[dict]] = {}
+        self.lock = threading.Lock()
+        self.messages = self
+        self.beta = NS(messages=self)
+
+    def route(self, params: dict) -> str:
+        """Which script a request belongs to."""
+        from llm.review import REVIEW_SYSTEM
+
+        if params["system"] == REVIEW_SYSTEM:
+            return "review"
+        first = params["messages"][0]["content"]
+        for block in first:
+            if block.get("type") == "text" and "Your part is " in block["text"]:
+                return block["text"].split("Your part is ")[1].split(". ")[0]
+        return "other"
+
+    def create(self, **params):
+        """Record the request under its route and return (or raise) that route's next item."""
+        key = self.route(params)
+        with self.lock:
+            self.requests.setdefault(key, []).append(
+                {**params, "messages": list(params["messages"])}
+            )
+            script = self.routes.get(key)
+            item = script.pop(0) if script else reply(text("Nothing to add."), stop="end_turn")
+        if isinstance(item, BaseException):
+            raise item
+        return item

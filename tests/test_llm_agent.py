@@ -1,14 +1,22 @@
 """The Claude tool loop, driven by a scripted fake client (no network, no cost)."""
 
+import base64
+import hashlib
+import io
+import json
+import os
 import time
+from pathlib import Path
 
 import pytest
 from PIL import Image
 
+from data.rasterize import decode_image, load_uvtt
 from llm import agent
 from llm.agent import Trace, detect_map_size, load_config, quadrant_boxes, trace_map
+from llm.views import MARGIN
 
-from conftest import FakeClient, call, reply, text
+from conftest import DEMO_MAP, FakeClient, call, reply, text
 
 ANSWER = {
     "walls": [{"points": [{"x": 1, "y": 1}, {"x": 9, "y": 1}]}],
@@ -204,3 +212,123 @@ def test_detect_map_size_uses_the_configs_limits():
     cfg["app"]["max_squares"] = 100
     image = Image.new("RGB", (700, 800), (90, 90, 90))
     assert detect_map_size(image, cfg, client, trace) is None
+
+
+GUARD = Path(__file__).parent / "fixtures" / "request_single_session.json"
+
+
+def first_request_summary(client: FakeClient) -> dict:
+    """What the first request of a pass sends, in a form that can be stored as JSON.
+
+    Text and tools are kept as they are; each image is kept as its pixel size and a SHA-256
+    of its base64 data, so any change to the views shows up without storing the images.
+    """
+    request = client.requests[0]
+    blocks = []
+    for block in request["messages"][0]["content"]:
+        if block["type"] == "image":
+            data = block["source"]["data"]
+            with Image.open(io.BytesIO(base64.b64decode(data))) as image:
+                size = list(image.size)
+            blocks.append(
+                {"type": "image", "size": size, "sha256": hashlib.sha256(data.encode()).hexdigest()}
+            )
+        else:
+            blocks.append(block)
+    return {"system": request["system"], "tools": request["tools"], "first_message": blocks}
+
+
+def single_session_first_request() -> dict:
+    """Run the single-session tracer on the demo map with a fake client; summarize request 1."""
+    label = load_uvtt(DEMO_MAP)
+    image = decode_image(label)
+    client = FakeClient(
+        [reply(call("submit_answer", ANSWER)), reply(text("Done."), stop="end_turn")]
+    )
+    trace_map(image, (25, 25), load_config(), client)
+    return first_request_summary(client)
+
+
+def test_single_session_first_request_is_unchanged():
+    """The single-session tracer sends exactly what it sent before the chunked pass existed.
+
+    Guards spec FR-016: adding the chunk window to `trace_map` must not change the existing
+    passes, so their scores in docs/results.md stay valid. Regenerate the fixture only for a
+    deliberate change to the single session: `REGENERATE_GUARD=1 pytest -k first_request`.
+    """
+    summary = single_session_first_request()
+    if os.environ.get("REGENERATE_GUARD"):
+        GUARD.write_text(json.dumps(summary, indent=1))
+    assert summary == json.loads(GUARD.read_text())
+
+
+# --- A chunk agent: trace_map on a window (feature 002) ---------------------------------------
+
+
+def image_sizes(blocks: list[dict]) -> list[tuple[int, int]]:
+    """Pixel sizes of the image blocks in a list of content blocks."""
+    sizes = []
+    for block in blocks:
+        if block["type"] == "image":
+            raw = base64.b64decode(block["source"]["data"])
+            with Image.open(io.BytesIO(raw)) as image:
+                sizes.append(image.size)
+    return sizes
+
+
+def run_window(script, window=(0, 0, 13.5, 13.5), core=(0, 0, 12.5, 12.5), size=25, ppg=70):
+    """Trace a plain map as a chunk agent on `window`; returns the trace and the client."""
+    client = FakeClient(script)
+    image = Image.new("RGB", (size * ppg, size * ppg), (90, 90, 90))
+    trace = trace_map(image, (size, size), load_config(), client, window=window, core=core)
+    return trace, client
+
+
+def test_chunk_agent_gets_the_chunk_prompt_an_outlined_overview_and_its_window():
+    """A chunk agent's first request: CHUNK_SYSTEM, the outlined overview, then the window at
+    full zoom (no quarters), then the intro naming the window and its core."""
+    trace, client = run_window(
+        [reply(call("submit_answer", ANSWER)), reply(text("Done."), stop="end_turn")]
+    )
+    first = client.requests[0]
+    assert first["system"] == agent.CHUNK_SYSTEM and first["system"] != agent.SYSTEM
+    assert agent.SYSTEM.split("## How to work")[0] in agent.CHUNK_SYSTEM
+    content = first["messages"][0]["content"]
+    assert [b["type"] for b in content].count("image") == 2
+    intro = content[-1]["text"]
+    assert "Your part is x 0 to 13.5, y 0 to 13.5" in intro
+    assert "x 0 to 12.5, y 0 to 12.5" in intro
+    assert trace.answer == ANSWER  # whole-map squares, as given
+
+
+def test_chunk_window_is_shown_at_no_less_than_the_image_detail():
+    """FR-002: a 13.5-square window of a 70 px map is shown above 70 px per square; a
+    51-square window of a 200 x 200 map is shown at the view cap (1300 px)."""
+    _, client = run_window([reply(text("x"), stop="end_turn")] * 2)
+    window_view = image_sizes(client.requests[0]["messages"][0]["content"])[1]
+    assert (window_view[0] - MARGIN) / 13.5 >= 70
+    _, client = run_window(
+        [reply(text("x"), stop="end_turn")] * 2,
+        window=(0, 0, 51, 51),
+        core=(0, 0, 50, 50),
+        size=200,
+        ppg=8,
+    )
+    window_view = image_sizes(client.requests[0]["messages"][0]["content"])[1]
+    assert window_view[0] - MARGIN == 1300
+
+
+def test_chunk_agent_crops_stay_inside_its_window():
+    """A view_region reaching past the window is clamped to it; the overlay after a
+    submission shows the window, not the whole map."""
+    _, client = run_window(
+        [
+            reply(call("view_region", {"x0": 10, "y0": 10, "x1": 20, "y1": 20, "overlay": False})),
+            reply(call("submit_answer", ANSWER)),
+            reply(text("Done."), stop="end_turn"),
+        ]
+    )
+    view_result = client.requests[1]["messages"][-1]["content"][0]["content"]
+    assert image_sizes(view_result) == [(560 + MARGIN, 560 + MARGIN)]  # 3.5 squares at 160 px
+    overlay = client.requests[2]["messages"][-1]["content"][0]["content"]
+    assert image_sizes(overlay) == [(1300 + MARGIN, 1300 + MARGIN)]  # the 13.5-square window

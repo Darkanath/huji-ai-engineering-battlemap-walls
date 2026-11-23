@@ -16,7 +16,7 @@ from pathlib import Path
 import anthropic
 from PIL import Image
 
-from llm.views import render_view, to_image_block
+from llm.views import Box, render_view, to_image_block
 from postprocess.uvtt import answer_to_uvtt
 
 CONFIG = Path(__file__).parent / "configs" / "claude.toml"
@@ -67,6 +67,31 @@ plus anything you were unsure about.
 
 View and submission counts are limited, so plan them: a handful of views that cover the \
 structure, rather than many tiny ones."""
+
+# A chunk agent (specs/002-chunked-map-tracing/) gets the same role, coordinates and labeling
+# rules word for word; only "How to work" differs. SYSTEM itself is left exactly as it was, so
+# the single-session passes send what they always sent (tests/fixtures/request_single_session.json).
+CHUNK_SYSTEM = (
+    SYSTEM.split("## How to work")[0]
+    + """## How to work
+You trace one part of a larger map. Other agents trace the other parts at the same time, and \
+their answers are joined afterwards, so stay inside your part. All coordinates are the whole \
+map's: read them off the labels, as on any view. You first get the whole map with your part \
+outlined in green, so you know what continues past your edges, then your part at higher zoom. \
+Trace everything inside your part up to its edge: a wall that runs on into a neighbour's part \
+stops exactly at your edge. Your part includes a margin that a neighbouring agent also traces; \
+trace it too, so the joins can be checked. Do not trace anything outside your part. Use \
+view_region for closer crops wherever a door, a window, a wall end or a light needs it, and \
+along every wall that might hold doors or windows. Then call submit_answer with the complete \
+answer for your part. It returns your answer drawn over your part; compare it with the \
+drawing, look closer at anything doubtful with view_region (overlay=true shows your lines on \
+the crop), and submit a corrected, complete answer if needed. The last submission is the \
+result. When it is right, reply with one short sentence saying so, plus anything you were \
+unsure about.
+
+View and submission counts are limited, so plan them: a handful of views that cover your \
+part, rather than many tiny ones."""
+)
 
 POINT = {
     "type": "object",
@@ -267,6 +292,8 @@ def trace_map(
     views_dir: Path | None = None,
     deadline: float | None = None,
     trace: Trace | None = None,
+    window: Box | None = None,
+    core: Box | None = None,
 ) -> Trace:
     """Run the tool loop on one map image and return the answer with its usage.
 
@@ -276,6 +303,12 @@ def trace_map(
     `stopped = "timeout"`), and each request may take only the time left. Pass a `trace` to
     add to one that already holds usage (the map-size step); if a request raises, that trace
     still holds everything spent before it.
+
+    With `window` (a box in whole-map squares) the loop runs as one chunk agent of the chunked
+    pass: `CHUNK_SYSTEM`, the whole map with the window outlined, then the window itself, crops
+    clamped to the window, and the answer overlay drawn on the window. `core` is the chunk's
+    own area inside the window, named in the intro (default: the window). Answers stay in
+    whole-map squares. Without `window`, nothing differs from before the chunked pass existed.
     """
     cfg = cfg or load_config()
     client = client or anthropic.Anthropic()
@@ -286,7 +319,7 @@ def trace_map(
     uvtt: dict | None = None  # the latest submission, for overlays
     shots = 0
 
-    def show(box, with_overlay: bool) -> tuple[dict, float]:
+    def show(box, with_overlay: bool, outline: Box | None = None) -> tuple[dict, float]:
         """Render a window, save a copy if asked, and return it as an image block."""
         nonlocal shots
         view, zoom = render_view(
@@ -296,6 +329,7 @@ def trace_map(
             view_cfg["max_px"],
             view_cfg["max_zoom"],
             uvtt if with_overlay else None,
+            outline=outline,
         )
         if views_dir is not None:
             views_dir.mkdir(parents=True, exist_ok=True)
@@ -312,7 +346,10 @@ def trace_map(
             if args["overlay"] and uvtt is None:
                 return [{"type": "text", "text": "Nothing submitted yet: no overlay."}], True
             trace.views += 1
-            block, zoom = show((args["x0"], args["y0"], args["x1"], args["y1"]), args["overlay"])
+            box = (args["x0"], args["y0"], args["x1"], args["y1"])
+            if window is not None:
+                box = _within(box, window)
+            block, zoom = show(box, args["overlay"])
             left = limits["max_views"] - trace.views
             text = f"{zoom:.0f} px per square. Views left: {left}."
             return [block, {"type": "text", "text": text}], False
@@ -323,7 +360,7 @@ def trace_map(
             trace.submissions += 1
             trace.answer = args
             uvtt = answer_to_uvtt(args, map_size)
-            block, _ = show((0, 0, *map_size), True)
+            block, _ = show(window or (0, 0, *map_size), True)
             left = limits["max_submissions"] - trace.submissions
             text = (
                 f"Recorded: {len(uvtt['line_of_sight'])} wall lines, {len(uvtt['portals'])} "
@@ -333,16 +370,19 @@ def trace_map(
             return [block, {"type": "text", "text": text}], False
         return [{"type": "text", "text": f"Unknown tool {name}."}], True
 
-    # The opening message: the whole map, then four overlapping quarters at higher zoom, so
-    # close reading does not depend on the model asking for it (v1 models rarely asked).
-    content: list[dict] = [{"type": "text", "text": "The whole map:"}]
-    content.append(show((0, 0, *map_size), False)[0])
-    if view_cfg.get("quadrants", True):
-        for box in quadrant_boxes(map_size):
-            label = f"Squares x {box[0]:g} to {box[2]:g}, y {box[1]:g} to {box[3]:g}:"
-            content += [{"type": "text", "text": label}, show(box, False)[0]]
-    intro = f"Trace this map. It is {map_size[0]} squares wide and {map_size[1]} squares high."
-    content.append({"type": "text", "text": intro})
+    if window is not None:
+        content = _chunk_opening(show, map_size, window, core or window)
+    else:
+        # The opening message: the whole map, then four overlapping quarters at higher zoom, so
+        # close reading does not depend on the model asking for it (v1 models rarely asked).
+        content = [{"type": "text", "text": "The whole map:"}]
+        content.append(show((0, 0, *map_size), False)[0])
+        if view_cfg.get("quadrants", True):
+            for box in quadrant_boxes(map_size):
+                label = f"Squares x {box[0]:g} to {box[2]:g}, y {box[1]:g} to {box[3]:g}:"
+                content += [{"type": "text", "text": label}, show(box, False)[0]]
+        intro = f"Trace this map. It is {map_size[0]} squares wide and {map_size[1]} squares high."
+        content.append({"type": "text", "text": intro})
     messages: list[dict] = [{"role": "user", "content": content}]
     reminded = False
 
@@ -357,7 +397,9 @@ def trace_map(
         if left is not None and left <= 0:
             trace.stopped = "timeout"
             break
-        response = _request(client, cfg, messages, timeout=left)
+        response = _request(
+            client, cfg, messages, timeout=left, system=SYSTEM if window is None else CHUNK_SYSTEM
+        )
         trace.turns += 1
         trace.add_usage(response.usage, prices)
         trace.served_by.add(response.model)
@@ -395,6 +437,39 @@ def trace_map(
             )
         messages.append({"role": "user", "content": results})
     return trace
+
+
+def _within(box: Box, window: Box) -> Box:
+    """`box` cut down to `window`; the whole window when they do not overlap."""
+    x0, y0 = max(min(box[0], box[2]), window[0]), max(min(box[1], box[3]), window[1])
+    x1, y1 = min(max(box[0], box[2]), window[2]), min(max(box[1], box[3]), window[3])
+    return (x0, y0, x1, y1) if x0 < x1 and y0 < y1 else window
+
+
+def _span(box: Box) -> str:
+    """ "x 0 to 13.5, y 0 to 13.5" for a box in squares."""
+    return f"x {box[0]:g} to {box[2]:g}, y {box[1]:g} to {box[3]:g}"
+
+
+def chunk_intro(map_size: tuple[int, int], window: Box, core: Box) -> str:
+    """A chunk agent's instructions for its part (the orchestrator's routing tests read it)."""
+    return (
+        f"Trace your part of this map. The map is {map_size[0]} squares wide and "
+        f"{map_size[1]} squares high. Your part is {_span(window)}. Its own area is "
+        f"{_span(core)}; the rest of your part is a margin that a neighbouring agent also "
+        "traces, so trace it too, up to the edge of your part."
+    )
+
+
+def _chunk_opening(show, map_size: tuple[int, int], window: Box, core: Box) -> list[dict]:
+    """A chunk agent's first message: the outlined overview, its window, and the intro."""
+    return [
+        {"type": "text", "text": "The whole map, your part outlined in green:"},
+        show((0, 0, *map_size), False, outline=window)[0],
+        {"type": "text", "text": f"Your part, {_span(window)}:"},
+        show(window, False)[0],
+        {"type": "text", "text": chunk_intro(map_size, window, core)},
+    ]
 
 
 SIZE_SYSTEM = """\
