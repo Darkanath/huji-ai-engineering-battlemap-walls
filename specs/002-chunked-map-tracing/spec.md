@@ -58,6 +58,17 @@ several tracing agents working at the same time, one merged result) working on a
   between parts: after the rule-based merge, it gets close-up crops along each border with the
   merged lines drawn, and fixes what crosses the borders.
 
+### Session 2026-11-23 (after the first live runs, T037)
+
+- Q: Should every model get the same part size? → A: No: each model has its own part size in
+  configuration. Haiku needs smaller parts (about 7 squares: 16 parts on a 25 x 25 map);
+  Sonnet and Opus keep about 13 (4 parts). Each part still gets its own fresh agent session,
+  at most 4 running at once; the other parts wait for a free agent. The 16-part cap stays.
+- Q: Haiku's 16 parts at 4 agents at a time take about 140 s, over SC-004's "twice the single
+  session" (about 70 s for Haiku). Amend the criterion or run more Haiku agents at once? → A:
+  Amend SC-004: the bound applies to Sonnet and Opus agents; Haiku is the cheap choice, not the
+  fast one, and gets its own bound of 3 minutes on a 25 x 25 map.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Trace a map in chunks and get one file (Priority: P1)
@@ -209,8 +220,8 @@ cost columns filled in.
   shows a square at less detail than the image has. (Corrected 2026-11-23 during planning: on
   the 25 x 25 reference maps the quarter views already exceed the image's own resolution, so
   "more pixels than the quarters" could not be met by any chunk size.)
-- **FR-003**: When the chunked pass is chosen, the map MUST always be split by the configured
-  chunk size and overlap; a map no larger than one chunk becomes a single chunk. The user does
+- **FR-003**: When the chunked pass is chosen, the map MUST always be split by the chosen
+  agents' model's configured part size and the overlap; a map no larger than one chunk becomes a single chunk. The user does
   not choose the chunk grid. A map has at most 4 chunks across and 4 down (16 in all; the
   limit is in configuration): when the configured chunk size would need more, the chunks grow
   instead, so the whole map is always covered.
@@ -317,8 +328,10 @@ cost columns filled in.
 - **SC-003**: In merged files, no wall that crosses a chunk border has a gap at the border
   larger than the scoring tolerance (0.1 square), and no portal or light is counted twice;
   checked on every reference map.
-- **SC-004**: A chunked pass on a 25 x 25 map finishes in no more than twice the
-  single-session time with the same model, with chunks running at the same time.
+- **SC-004**: A chunked pass on a 25 x 25 map with Sonnet or Opus agents finishes in no more
+  than twice the single-session time with the same model, with chunks running at the same
+  time. With Haiku agents (smaller parts, so 16 parts at 4 at a time) it finishes in no more
+  than 3 minutes. (Amended 2026-11-23, see Clarifications.)
 - **SC-005**: The estimated cost shown before a chunked pass is within 50% of the actual
   estimated cost after it, on the reference maps.
 - **SC-006**: Every chunk and seam-review failure case in FR-012 and FR-020 produces a plain-language message and, where
@@ -342,8 +355,8 @@ cost columns filled in.
   same change.
 - The map size is known before chunking: typed by the user or worked out by the existing
   map-size step, once per map, not per chunk.
-- The default chunk layout is about 13 x 13 squares of core area with a 1-square overlap, which
-  gives four chunks on the default 25 x 25 map. It is tuned from measurements.
+- Part sizes per model, with a 1-square overlap: Haiku about 7 squares (16 parts on the
+  default 25 x 25 map), Sonnet and Opus about 13 (4 parts). They are tuned from measurements.
 - A chunked pass costs more than a single-session pass (several sessions, each with its own
   images and conversation). The goal is better accuracy on caves, doors and large maps, not a
   lower price. Expected time and cost are in configuration as estimates, shown as such, until

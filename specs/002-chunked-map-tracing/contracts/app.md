@@ -28,11 +28,11 @@ agents: AgentChoice | None = None, board: ChunkBoard | None = None) -> TraceResu
 | `can_start(session, kind)` | `chunked` behaves like `quick`: an image and nothing running |
 | `begin_pass(session, kind)` | for `chunked`, a `PassTicket` carrying `agents`, and `session.board` set for the layout of the size used (rebuilt by the tracer if the size step changes it) |
 | `finish_pass(...)` | clears `session.board`; otherwise unchanged |
-| `button_labels(settings, map_size, detect, agents)` | new signature; the existing callers (`app/main.py`) and tests are updated, and the two existing labels are unchanged. Adds `PassKind.chunked`: e.g. `"Chunked pass: 4 Sonnet agents (about 45 s, about $0.29, estimate)"`, from `ChunkedSettings.expected`; "estimate" while the choice's `estimate` is true. With `detect` on it adds the upper bound from `ChunkedSettings.expected_max`: `"… for 25 x 25; up to $1.04 and 128 s if the detected size needs 16 parts"` (FR-011) |
+| `button_labels(settings, map_size, detect, agents)` | new signature; the existing callers (`app/main.py`) and tests are updated, and the two existing labels are unchanged. Adds `PassKind.chunked`: e.g. `"Chunked pass: 4 parts on 4 Sonnet agents (about 45 s, about $0.29, estimate)"` or `"Chunked pass: 16 parts on 4 Haiku agents (about 140 s, about $0.13, estimate)"` (the agents are the ones working at once, at most `max_parallel`), from `ChunkedSettings.expected`; "estimate" while the choice's `estimate` is true. With `detect` on it adds the upper bound from `ChunkedSettings.expected_max`: `"… for 25 x 25; up to $1.04 and 128 s if the detected size needs 16 parts"` (FR-011) |
 | `preview(session)` | while a chunked pass runs: the map with the board drawn (`render.chunk_overlay`); after: the mask, with untraced parts outlined |
 | `progress_line(session)` (new) | `"Working… 12 s"`; for a chunked pass `" · 2 of 4 parts done"`, then `" · checking the borders"` |
 | `agent_table(session)` (new) | rows for the last result if it is chunked, else `None`: `Part`, `State`, `Time`, `Cost`, `Closer views`, `Walls`, `Doors/windows`, `Lights`, then a row `Borders (Sonnet 5.5)` with state, time, cost and "n lines changed" or the reason it did not run |
-| `status_line(session)` | chunked: `"Chunked · 4 Sonnet 5.5 agents + Sonnet 5.5 orchestrator · 41 s · about $0.27 · 14 walls, …"` |
+| `status_line(session)` | chunked: `"Chunked · 4 parts on 4 Sonnet 5.5 agents + Sonnet 5.5 orchestrator · 41 s · about $0.27 · 14 walls, …"` |
 | `result_message(session)` | chunked with `untraced` and/or review not `done`: `errors.partial_message(...)` and/or `errors.SEAMS_NOT_CHECKED`; otherwise unchanged |
 
 ## `app/errors.py`

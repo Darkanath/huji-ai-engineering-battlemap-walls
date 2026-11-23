@@ -67,7 +67,7 @@ pass. Expected:
 - "Accept mask" downloads one `.dd2vtt`. Import it into Roll20 (Page Menu → Upload Background)
   and check the walls at x = 12.5 and y = 12.5 have no gaps (owner; US1 scenario 5).
 
-Optionally repeat with Haiku (about $0.07).
+Optionally repeat with Haiku (about $0.13: 16 parts, four agents at a time).
 
 ## 5. Reference evaluation (paid; owner approves each run first)
 
@@ -77,7 +77,7 @@ docker compose run --rm app python -m llm.run --reference --chunked --agents hai
 docker compose run --rm app python -m llm.run --reference --chunked --agents opus   --run <date>_chunked_opus
 ```
 
-About $1.2, $0.3 and $3.8 (research.md R13); each prints its estimate and asks before sending
+About $1.2, $0.5 and $3.8 (research.md R13); each prints its estimate and asks before sending
 anything. Record in `docs/results.md` a new section: the table (same columns as the 13.11
 reference evaluation, plus agents, chunks, review state, and the rule-merged scores next to the
 reviewed ones), run names, costs and sample size (one run per map), and the comparison with

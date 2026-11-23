@@ -53,6 +53,12 @@ neighbour, clipped to the map.
 **Alternatives considered**: a fixed 2 x 2 for every map: does not scale. Content-aware cuts
 (along empty floor): needs a model or a heuristic, and the seam review (R6) handles the seams.
 
+**Revised 23.11 after the first live runs (T037):** the part size is per model
+(`[chunked.agents.<choice>].core_squares`): Haiku 7 squares (16 parts on 25 x 25, four agents
+at a time, so about four rounds), Sonnet and Opus 13. The 16-part cap is unchanged, so on maps
+larger than about 28 x 28 Haiku's parts grow as Sonnet's do. Haiku on 25 x 25: about $0.13 and
+140 s (estimate); its live 4-part runs cost $0.07 in 54 s.
+
 ## R3. How a chunk agent works: reuse `trace_map` with a window
 
 **Decision**: add an optional `window` (a box in whole-map squares) to `llm.agent.trace_map`.
@@ -245,7 +251,7 @@ only under `[chunked.agents]`.
 
 ## R13. The paid evaluation
 
-The full US3 run over the three choices on four maps is about $0.28 (Haiku) + $1.16 (Sonnet) +
-$3.80 (Opus) ≈ **$5.25**. Plan: Sonnet first (≈ $1.2, the default and the demo), then Haiku
-(≈ $0.3), then Opus only if the owner wants the row for the slides. Each is a separate run the
+The full US3 run over the three choices on four maps is about $0.52 (Haiku, 16 parts per map
+since 23.11) + $1.16 (Sonnet) + $3.80 (Opus) ≈ **$5.50**. Plan: Sonnet first (≈ $1.2, the default and the demo), then Haiku
+(≈ $0.5), then Opus only if the owner wants the row for the slides. Each is a separate run the
 owner approves, with its estimate printed before any call.

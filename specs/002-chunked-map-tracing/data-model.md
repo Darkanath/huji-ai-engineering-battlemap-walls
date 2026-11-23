@@ -23,7 +23,8 @@ The selector's value. Default from `[chunked].default_agents` (`"sonnet"`).
 
 ## Layout (function result)
 
-`chunk_layout(map_size, core_squares, overlap_squares, max_per_side) -> list[Chunk]`
+`chunk_layout(map_size, core_squares, overlap_squares, max_per_side) -> list[Chunk]`, with
+`core_squares` the chosen agents' model's part size (`[chunked.agents.<choice>].core_squares`)
 
 - `nx = min(ceil(W / core_squares), max_per_side)`, likewise `ny`; core size `W / nx` by `H / ny`.
 - Config validation: `core_squares >= 2`, `0 <= overlap_squares < core_squares / 2`,
@@ -148,8 +149,7 @@ New `chunked: ChunkedSettings`:
 | Field | Type | Rule |
 | --- | --- | --- |
 | `default_agents` | AgentChoice | |
-| `core_squares` | float | >= 2 |
-| `overlap_squares` | float | >= 0, < core_squares / 2 |
+| `overlap_squares` | float | >= 0, < every choice's core_squares / 2 |
 | `max_per_side` | int | 1..4 |
 | `max_parallel` | int | >= 1 |
 | `agents` | dict[AgentChoice, AgentSettings] | all three present |
@@ -157,14 +157,14 @@ New `chunked: ChunkedSettings`:
 | `review` | ReviewSettings | `strip_squares` > 0; `max_turns`, `max_views`, `max_submissions`, `max_cost_usd`; `expected_seconds`, `expected_cost_usd` (dicts keyed by orchestrator choice) |
 | `merge` | MergeSettings | `join_tolerance_squares` > 0, `min_piece_squares` >= 0 |
 
-`AgentSettings`: `name`, `label`, `effort`, `max_tokens`, `fallbacks`, `orchestrator`
+`AgentSettings`: `core_squares` (>= 2; the model's part size), `name`, `label`, `effort`, `max_tokens`, `fallbacks`, `orchestrator`
 (`"sonnet"` \| `"opus"`, must name an entry in `agents`), `deadline_s`, `max_cost_usd`,
 `expected_seconds_per_chunk`, `expected_cost_per_chunk_usd`, `estimate` (bool: true until
 measured; the button then says "estimate").
 
 Validated: every model named has a price in `[prices]`; the orchestrator entries exist.
 
-Methods: `layout(map_size)`, `expected_max(agents, detect) -> (seconds, cost)` (the same
+Methods: `layout(map_size, agents)`, `expected_max(agents, detect) -> (seconds, cost)` (the same
 formula for a `max_per_side` x `max_per_side` layout: the most a pass can take and cost, shown
 when detection may change the chunk count; FR-011), and
 `expected(map_size, agents, detect) -> (seconds, cost)`:

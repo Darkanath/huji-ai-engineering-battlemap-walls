@@ -50,11 +50,12 @@ each agent's script by the window named in its first request. The shared fake is
 
 | Agents | 25 x 25 (4 chunks + review) | 50 x 50 (16 chunks + review) |
 | --- | --- | --- |
-| Haiku | ~$0.07, ~50 s | ~$0.13, ~140 s |
+| Haiku (7-square parts: 16 on 25 x 25) | ~$0.13, ~140 s | ~$0.13, ~140 s |
 | Sonnet | ~$0.29, ~45 s | ~$1.01, ~120 s |
 | Opus | ~$0.95, ~105 s | ~$3.35, ~285 s |
 
-SC-004 (at most twice the single session's time, same model): Sonnet ~45 s against 2 x 25 s.
+SC-004 (amended 23.11): Sonnet and Opus at most twice the single session's time (Sonnet ~45 s
+against 2 x 25 s; Opus ~105 s against 2 x 70 s); Haiku at most 3 minutes (~140 s estimated).
 Preview refresh while running: once a second, as now.
 
 **Constraints**: only model calls leave the laptop; no paid call in tests; nothing sent before

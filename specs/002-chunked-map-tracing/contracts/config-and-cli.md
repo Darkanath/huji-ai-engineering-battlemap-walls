@@ -9,7 +9,6 @@
 # agents' model; the orchestrator's follows from it (constitution 2.1.0).
 [chunked]
 default_agents = "sonnet"
-core_squares = 13          # largest side of a chunk's own area; sides are split evenly
 overlap_squares = 1        # each chunk also sees and traces this far into its neighbours
 max_per_side = 4           # at most 4 x 4 = 16 chunks; larger maps get larger chunks
 max_parallel = 4           # agents running at the same time
@@ -17,6 +16,7 @@ max_parallel = 4           # agents running at the same time
 # One entry per selector choice. ESTIMATE figures are replaced after the measured run
 # (research.md R5, R13); `estimate = false` then drops the "estimate" word on the button.
 [chunked.agents.haiku]
+core_squares = 7                    # the model's part size: 16 parts on 25 x 25
 name = "claude-haiku-5-5"
 label = "Haiku 5.5"
 effort = "medium"
@@ -30,6 +30,7 @@ expected_cost_per_chunk_usd = 0.005 # ESTIMATE
 estimate = true
 
 [chunked.agents.sonnet]
+core_squares = 13                   # 4 parts on 25 x 25
 name = "claude-sonnet-5-5"
 label = "Sonnet 5.5"
 effort = "medium"
@@ -43,6 +44,7 @@ expected_cost_per_chunk_usd = 0.06  # ESTIMATE
 estimate = true
 
 [chunked.agents.opus]
+core_squares = 13
 name = "claude-opus-5-5"
 label = "Opus 5.5"
 effort = "medium"
