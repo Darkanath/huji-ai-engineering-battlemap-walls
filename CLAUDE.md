@@ -17,9 +17,10 @@ Where to look before starting a piece of work:
   disagree.
 - `specs/NNN-name/`: the spec, plan and tasks of each feature (current: `specs/001-battlemap-tracer-app/`).
 - `docs/results.md`: every measurement. `docs/lessons.md`: what didn't work, for the slides.
-- `docs/PLAN.md`: the project plan, rewritten around the tracer on 2026-11-13. `docs/roadmap/`:
-  weeks 5-9 (index in `docs/roadmap/README.md`). `docs/history/`: the first approach's training
-  notes, the old map specs, the app plan the spec grew from, and roadmap weeks 1-4.
+- `docs/PLAN.md`: the project plan, rewritten around the tracer on 2026-11-13. `docs/history/`:
+  the first approach's training notes, the old map specs, the app plan the spec grew from, and
+  roadmap weeks 1-4 (the week-by-week roadmap for later weeks was dropped on 2026-11-23; the
+  specs' task lists track the work).
 
 Final presentation: 2026-12-23.
 
@@ -126,7 +127,7 @@ data/            rasterize.py (.dd2vtt -> mask, LIGHT_TIERS), manifest.py, retie
   test/          published third-party maps, for trying the app only       [never committed]
 notebooks/       eda.ipynb: data exploration for the Data slide (runs on Colab)
 specs/           feature specs, plans and tasks (Spec Kit)
-docs/            PLAN.md, results.md, lessons.md, labeling rules, map log, roadmap/, history/
+docs/            PLAN.md, results.md, lessons.md, labeling rules, map log, history/
 runs/            run outputs, answers, previews, scores                    [gitignored]
 tests/           pytest
 ```
@@ -160,7 +161,8 @@ Datasets and runs are mounted as Docker volumes so they persist on the host.
   with a labeled square grid; it can ask for closer crops; it submits walls (polylines and arcs),
   portals and lights in grid squares, and sees its answer drawn over the map before it finishes.
   Limits per map (turns, views, submissions, cost) are in the config.
-- **Chunked tracing:** the map is split into equal cores of about 13 squares (at most 4 x 4),
+- **Chunked tracing:** the map is split into equal cores of the agents' model's part size
+  (Haiku about 7 squares, Sonnet and Opus about 13; at most 4 x 4 parts; 4 agents at a time),
   each traced by its own agent on its core plus a 1-square margin; the answers are merged by
   core ownership (each chunk keeps what lies in its own core), seam ends are snapped and
   joined, then the orchestrator model rewrites only the strips 1 square either side of each

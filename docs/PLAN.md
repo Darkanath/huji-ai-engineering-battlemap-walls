@@ -194,7 +194,7 @@ One page, Python only (Gradio). Full behaviour: the spec; build plan: `specs/001
 
 ## Timeline
 
-Weeks 1–3 built the first approach; week 4 is the pivot; the app and the full evaluation follow, and the last two weeks are analysis and the presentation. Week-by-week tasks: [roadmap/](roadmap/README.md).
+Weeks 1–3 built the first approach; week 4 is the pivot; the app and the full evaluation follow, and the last two weeks are analysis and the presentation. The work is tracked in each feature's task list under `specs/`.
 
 1. **20–26.10:** Requirements, labeling rules, .dd2vtt → mask rasterizer, repo and Docker, first 3 Dungeondraft maps, Roll20 format check. *Done.*
 2. **27.10–2.11:** Synthetic generator, light labels, manifest, metrics, Canny baseline, evaluation harness, `dd04`–`dd08`. *Done.*

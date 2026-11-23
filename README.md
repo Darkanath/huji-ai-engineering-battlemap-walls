@@ -33,7 +33,8 @@ baseline) is in the git history up to commit `7a5979d`.
 
 See [`docs/PLAN.md`](docs/PLAN.md) for the full plan and evaluation,
 [`specs/001-battlemap-tracer-app/spec.md`](specs/001-battlemap-tracer-app/spec.md) for what the
-app does, and [`docs/roadmap/`](docs/roadmap/README.md) for week-by-week tasks.
+app does, and [`specs/002-chunked-map-tracing/spec.md`](specs/002-chunked-map-tracing/spec.md)
+for the chunked pass.
 
 ## Status
 
@@ -131,7 +132,7 @@ data/            rasterize.py (.dd2vtt -> mask), manifest.py, retier_lights.py (
   reference/     four labeled maps for the tracer's reference evaluation (committed)
 notebooks/       eda.ipynb: data exploration for the Data slide
 specs/           feature specs, plans and tasks
-docs/            PLAN.md, results.md, lessons.md, labeling-rules.md, map-log.md, roadmap/,
+docs/            PLAN.md, results.md, lessons.md, labeling-rules.md, map-log.md,
                  history/ (training notes, old map specs, app plan, roadmap weeks 1-4)
 runs/            run outputs: answers, previews, scores (gitignored)
 tests/           pytest
