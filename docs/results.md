@@ -267,3 +267,99 @@ runs/test-maps/lakeside-tavern-2.png --squares 35 20 --size-only` (runs
   image" is **off by default** (`[app] detect_size_default = false`); the user ticks it when
   wanted. The size note now shows the implied px per square (e.g. "56 x 32 squares, 40 px
   per square"), so a wrong count is easy to spot and correct for free.
+
+## Chunked tracing · reference maps (23.11)
+
+The chunked pass (`specs/002-chunked-map-tracing/`): the map is split into parts, each traced
+by its own agent (at most 4 at a time), the answers are merged by fixed rules, and an
+orchestrator model (Sonnet) rewrites the strips 1 square either side of each border. Sonnet
+agents get 13-square parts (4 per 25 x 25 map), Haiku agents 7-square parts (16 per map).
+Merge as fixed on 23.11 (commit `b6cb8a1`: borders at quarter squares, one-to-one joins).
+Traced and scored on the true map size (25 x 25, no size step), at 32 px per square, against
+the four reference maps. **One run per map.** The rule-merged answer and the reviewed one are
+scored from the same run.
+
+Commands: `python -m llm.run --reference --chunked --agents sonnet --run 20261123_chunked_sonnet`
+and the same with `--agents haiku --run 20261123_chunked_haiku`. Runs:
+`runs/20261123_chunked_sonnet/`, `runs/20261123_chunked_haiku/`. Cost: $0.83 (Sonnet) +
+$0.59 (Haiku) = **$1.42** (estimated before the run: $1.7). Opus agents were not run.
+
+Figures: `python -m eval.figures` writes `docs/figures/` from the runs' `summary.csv` files.
+
+### Means over the four maps
+
+| Method | Wall boundary F1, mean | worst map | Portal recall, mean | Light IoU, mean | Cost per map | Time per map |
+| --- | --- | --- | --- | --- | --- | --- |
+| Single session, Sonnet (13.11) | 0.803 | 0.545 | 0.08 | 0.293 | $0.085 | 22 s |
+| Single session, Opus (13.11) | **0.962** | **0.893** | **0.92** | 0.418 | $0.324 | 70 s |
+| Chunked, Sonnet agents (4 parts) | 0.832 | 0.728 | 0.26 | 0.323 | $0.207 | 30 s |
+| Chunked, Haiku agents (16 parts) | 0.898 | 0.816 | 0.70 | **0.457** | $0.147 | 103 s |
+
+![Wall boundary F1 per reference map](figures/boundary_f1_wall.png)
+
+![Doors and windows found per reference map](figures/portal_recall.png)
+
+### Per map, chunked runs
+
+"Merged" is the rule merge before the border review; the other scores are the final answer.
+"Hanging ends" counts wall ends left on a border with no wall within 0.1 square (spec SC-003).
+
+| Map | Agents | Wall IoU | Wall boundary F1 | Merged F1 | Portal recall | Light IoU | Hanging ends (merged → final) | Cost | Time |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `dd04_a` tavern | Sonnet | 0.522 | 0.846 | 0.839 | 0 / 23 | 0.123 | 1 → 0 | $0.17 | 21 s |
+| | Haiku | 0.714 | 0.907 | 0.906 | 0.83 | 0.451 | 2 → 2 | $0.14 | 96 s |
+| `dd04_d` tavern, no grid | Sonnet | 0.391 | 0.839 | 0.854 | 0.22 | 0.218 | 0 → 0 | $0.18 | 20 s |
+| | Haiku | 0.792 | 0.952 | 0.952 | 0.87 | 0.359 | 0 → 0 | $0.13 | 91 s |
+| `dd06_a` mine | Sonnet | 0.330 | 0.728 | 0.750 | 0.75 | 0.478 | 4 → 0 | $0.24 | 42 s |
+| | Haiku | 0.513 | 0.918 | 0.923 | 0.75 | 0.443 | 7 → 4 | $0.14 | 95 s |
+| `dd07_a` castle | Sonnet | 0.571 | 0.915 | 0.930 | 0.06 | 0.472 | 0 → 0 | $0.24 | 36 s |
+| | Haiku | 0.560 | 0.816 | 0.761 | 0.35 (merged 0.41) | 0.576 | 12 → 0 | $0.18 | 131 s |
+
+No part failed or was skipped in either run, and no door or light was counted twice.
+
+![Estimated cost per map](figures/cost_per_map.png)
+
+![Time per map](figures/time_per_map.png)
+
+### Does the border review help?
+
+![Rule merge against the reviewed answer](figures/review_effect.png)
+
+- **Sonnet agents (2 borders):** the review lowered wall boundary F1 on 3 of 4 maps (by
+  0.015-0.023) and raised it on 1 (+0.007). It removed every hanging wall end (5 → 0).
+- **Haiku agents (6 borders, the strips cover about half the map):** no change on three maps;
+  on the castle it raised wall F1 by 0.055 (and wall IoU by 0.058) and removed all 12 hanging
+  ends, but lost one door (portal recall 0.41 → 0.35).
+- It costs $0.03-0.06 per map with 4 parts and $0.09-0.12 with 16.
+
+### Against the success criteria (spec 002)
+
+| Criterion | Result |
+| --- | --- |
+| SC-001: chunked wall F1 >= single session with the same model on every map; mine above 0.545 with the fast model | **Partly.** Sonnet: mine 0.545 → **0.728**, tavern and castle equal or better, but the no-grid tavern lower (0.916 → 0.839). Haiku has no comparable single-session run (v1 harness on 13.11: castle 0.500, mine 0.467; chunked: 0.816, 0.918) |
+| SC-002: portal recall >= single session; above 0 on the tavern and the castle with the fast model | **Partly.** Sonnet: equal or better everywhere, castle 0 → 0.06, but the tavern still 0 of 23. Haiku agents find most doors on both taverns (0.83, 0.87) |
+| SC-003: no border gap over 0.1 square, nothing counted twice | **Met for Sonnet** (0 hanging ends, 0 duplicates). **Not met for Haiku**: 2 hanging ends on the tavern and 4 on the mine after the review; 0 duplicates |
+| SC-004 (amended 23.11): Sonnet at most twice the single session; Haiku at most 3 minutes | **Met.** Sonnet 20-42 s against 28-58 s allowed; Haiku 91-131 s |
+| SC-005: estimate shown before within 50% of the actual cost | **Met.** Sonnet estimate $0.29 against $0.17-0.24 (−17% to −40%); Haiku $0.13 against $0.13-0.18 (+2% to +37%) |
+| SC-009: the review never lowers wall F1 or portal recall | **Not met.** Lower wall F1 on 3 of 4 Sonnet maps (by up to 0.023) and lower portal recall on the Haiku castle |
+
+### What this shows
+
+- **Chunking pays most with a small model.** Haiku agents on 16 parts scored a mean wall F1
+  of 0.898 and portal recall of 0.70, well above the single-session Sonnet pass (0.803, 0.08)
+  and Sonnet agents on 4 parts (0.832, 0.26), at $0.15 a map. Small parts made Haiku look
+  closer: it asked for a closer view in 36 of its 64 parts, where Sonnet agents asked in 1 of
+  16 and the single-session passes in almost none (13.11).
+- **Opus in one session is still the most accurate** (0.962, 0.92) and costs about twice as
+  much as Haiku chunked, but runs faster (70 s against 103 s).
+- **Sonnet agents with 4 parts** fixed the cave (0.545 → 0.728) but still miss the doors in
+  buildings: like the single session, they almost never asked for a closer view (1 of 16
+  parts).
+- **The border review is a trade-off, not a free gain.** It cleans up joins (hanging ends to
+  zero in 6 of 8 runs) but mostly shaves a little wall accuracy, so SC-009 is not met.
+
+Known weaknesses: one run per map, so differences under about 0.03 are within run-to-run
+noise; four maps, all 25 x 25 at 70 px per square (research.md R1), two of them (the taverns) the
+same layout in two styles; the single-session rows are from 13.11, a different day; Opus agents not run.
+Measured time and cost now replace the estimates in `llm/configs/claude.toml` for Sonnet and
+Haiku (T044).
