@@ -9,8 +9,9 @@ import anthropic
 import pytest
 
 from llm import run
+from llm.merge import chunk_layout
 
-from conftest import DEMO_MAP, FakeClient, call, reply, text
+from conftest import DEMO_MAP, FakeClient, RoutingFake, call, reply, span, text
 
 ANSWER = {
     "walls": [{"points": [{"x": 1, "y": 1}, {"x": 9, "y": 1}]}],
@@ -102,3 +103,97 @@ def test_size_only_runs_one_request_per_map_and_records_it(setup):
     assert (out / "demo" / "size.json").exists() and not (out / "demo" / "trace.json").exists()
     row = next(csv.DictReader((out / "summary.csv").open()))
     assert row["detected_size"] == "3x3" and row["true_size"] == "25x25"
+
+
+# --- --chunked (feature 002) -----------------------------------------------------------------
+
+
+@pytest.fixture
+def chunked_setup(tmp_path, monkeypatch):
+    """The one-map reference folder and a routing fake: four agents (two trace a wall across
+    x = 12.5) and a reviewer that resubmits the wall's strip part."""
+    reference = tmp_path / "reference"
+    reference.mkdir()
+    shutil.copy(DEMO_MAP, reference / "demo.dd2vtt")
+    monkeypatch.setattr(run, "REFERENCE", reference)
+    monkeypatch.setattr(run, "RUNS", tmp_path / "runs")
+    windows = [c.window for c in chunk_layout((25, 25), 13, 1, 4)]
+
+    def submits(tool, walls):
+        """A script that submits `walls` with `tool` once and finishes."""
+        answer = {"walls": walls, "arcs": [], "portals": [], "lights": []}
+        return [reply(call(tool, answer)), reply(text("Done."), stop="end_turn")]
+
+    wall = [{"points": [{"x": 3, "y": 5}, {"x": 22, "y": 5}]}]
+    client = RoutingFake(
+        {
+            **{span(w): submits("submit_answer", wall) for w in windows[:2]},
+            **{span(w): submits("submit_answer", []) for w in windows[2:]},
+            "review": submits(
+                "submit_corrections", [{"points": [{"x": 11.5, "y": 5}, {"x": 13.5, "y": 5}]}]
+            ),
+        }
+    )
+    monkeypatch.setattr(anthropic, "Anthropic", lambda *a, **k: client)
+    return tmp_path / "runs" / "c", client
+
+
+CHUNKED_ARGS = ["--reference", "--chunked", "--agents", "sonnet", "--run", "c"]
+
+
+def test_chunked_run_writes_every_file_and_both_score_sets(chunked_setup):
+    """Per map: merged and final answers, the file, the merge and review records, and each
+    chunk's folder; the summary has both score sets and the seam checks."""
+    out, client = chunked_setup
+    run.main([*CHUNKED_ARGS, "--yes"])
+    demo = out / "demo"
+    for name in (
+        "merged.json",
+        "answer.json",
+        "demo.dd2vtt",
+        "preview.jpg",
+        "trace.json",
+        "merge.json",
+        "review/trace.json",
+        "review/responses.json",
+        "review/submission.json",
+    ):
+        assert (demo / name).exists(), name
+    for i in range(4):
+        assert (demo / "chunks" / str(i) / "trace.json").exists()
+        assert any((demo / "chunks" / str(i) / "views").glob("*.jpg"))
+    assert (demo / "chunks" / "0" / "answer.json").exists()
+    row = next(csv.DictReader((out / "summary.csv").open()))
+    assert row["method"] == "chunked" and row["agents"] == "sonnet"
+    assert row["orchestrator"] == "claude-sonnet-5-5" and row["chunks"] == "4"
+    assert row["chunks_failed"] == "0" and row["chunks_skipped"] == "0"
+    assert row["review"] == "done" and float(row["review_cost_usd"]) > 0
+    for name in (
+        "boundary_f1_wall",
+        "portal_recall",
+        "seam_gap_ends",
+        "duplicate_portals",
+        "duplicate_lights",
+    ):
+        assert row[name] != "" and row[f"merged_{name}"] != "", name
+
+
+def test_chunked_estimate_is_chunks_times_cost_plus_review(chunked_setup, monkeypatch, capsys):
+    """Without --yes the prompt states 4 x $0.06 + $0.05 = $0.29 for the map; "n" sends
+    nothing."""
+    out, client = chunked_setup
+    monkeypatch.setattr("sys.stdin", io.StringIO("n\n"))
+    run.main(CHUNKED_ARGS)
+    printed = capsys.readouterr().out
+    assert "estimated cost about $0.29" in printed
+    assert "4 chunks" in printed and "$0.06 per chunk" in printed
+    assert client.requests == {} and not out.exists()
+
+
+def test_chunked_map_is_skipped_without_redo(chunked_setup):
+    """A second chunked run in the same folder does not pay again."""
+    out, client = chunked_setup
+    run.main([*CHUNKED_ARGS, "--yes"])
+    sent = sum(len(v) for v in client.requests.values())
+    run.main([*CHUNKED_ARGS, "--yes"])
+    assert sum(len(v) for v in client.requests.values()) == sent
