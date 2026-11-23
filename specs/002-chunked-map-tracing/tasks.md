@@ -258,3 +258,14 @@ Each part keeps its own fresh agent session, at most 4 at once; the 16-part cap 
 ## Phase 9: Convergence
 
 - [X] T060 Resolve the conflict between the per-model part size and SC-004 for Haiku: with 7-square parts a 25 x 25 Haiku pass is 16 parts at 4 agents at a time, estimated at about 140 s, while SC-004 allows at most twice Haiku's single-session time (31-36 s on 13.11, so about 70 s). Either (a) the owner amends SC-004 in `spec.md` (for example "for Sonnet and Opus", or a separate bound for Haiku) and `plan.md`'s performance line, or (b) make `max_parallel` a per-model setting in `llm/configs/claude.toml` / `app/config.py` (Haiku 8, tested in `tests/test_app_config.py` and `tests/test_llm_orchestrator.py`) and re-estimate; record the choice in the spec's Clarifications, per SC-004 / spec clarification 23.11 (contradicts)
+
+## Phase 10: Merge fixes from the live Haiku runs (2026-11-23)
+
+**Purpose**: the owner's 16-part Haiku runs showed walls joined wrongly and wall pieces
+missing (research.md R4, revised 23.11). Each bug has a test that reproduced it first.
+
+- [X] T061 In `llm/merge.py`, place inner borders at quarter squares (`_off_grid`, `_cuts`) so seams never lie on whole or half squares; test in `tests/test_llm_merge.py`, per FR-008 / FR-001
+- [X] T062 In `llm/merge.py`, keep walls along a seam from both sides and keep one when both neighbours drew it (`_dedupe_along_seams`, `MergeReport.walls_deduped`, logged in `app/tracer.py`); tests for the lost, doubled and one-sided cases, per FR-008 / FR-013
+- [X] T063 In `llm/merge.py`, replace transitive snapping with one-to-one pairing across a seam (`_pair_and_join`): ends from different parts, on opposite sides of the seam, within the tolerance of it and of each other, closest first, never through a door; also used by `apply_review` at strip edges; tests for same-side ends, chains, doors, small gaps, and a wall beside a seam, per FR-008
+- [X] T064 Add a seeded test of imperfect agents on a grid-aligned 26 x 28 map (perfect agents F1 >= 0.99; agents stopping at their own area F1 >= 0.94, no hanging seam ends) in `tests/test_llm_merge.py`, and update `research.md`, `data-model.md`, `contracts/orchestrator.md`, `CLAUDE.md` and `docs/lessons.md`, per SC-003
+

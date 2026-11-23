@@ -79,7 +79,8 @@ Derived for the agent table: `counts()` → walls (polylines + arcs), portals, l
 | --- | --- |
 | `walls_in` / `walls_out` | int: polylines before clipping / after joining |
 | `pieces_dropped` | int |
-| `ends_snapped` / `joins` | int |
+| `ends_snapped` / `joins` | int: ends moved to meet their partner across a seam / joins made |
+| `walls_deduped` | int: walls along a seam drawn by both neighbours, kept once |
 | `portals_kept`, `portals_dropped` | list[int], per chunk index |
 | `lights_kept`, `lights_dropped` | list[int], per chunk index |
 

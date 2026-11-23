@@ -56,8 +56,11 @@ Guarantees, each tested:
 
 - same input, same output; no output point outside the map;
 - every portal and light in a merge comes from the chunk that owns it;
-- a wall crossing a seam with ends within tolerance comes out as one polyline; a seam end with
-  no partner is not moved beyond the tolerance and never extended;
+- inner borders sit at quarter squares (x.25 / x.75), never on whole or half squares;
+- a wall crossing a seam with ends within tolerance of it and of each other comes out as one
+  polyline; ends are paired one to one, only across the seam, closest first, never through a
+  door; an end with no partner is not moved; a wall beside a seam is never pulled onto it;
+- a wall along a seam is kept: once when both neighbours drew it, and also when only one did;
 - one chunk: the merge returns its answer (arcs as polylines, clipped to the map);
 - `apply_review` changes nothing outside the strips: every wall point, portal and light of
   `merged` outside the strips' union is in the result, and nothing from `submission` outside

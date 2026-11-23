@@ -163,9 +163,10 @@ Datasets and runs are mounted as Docker volumes so they persist on the host.
   Limits per map (turns, views, submissions, cost) are in the config.
 - **Chunked tracing:** the map is split into equal cores of the agents' model's part size
   (Haiku about 7 squares, Sonnet and Opus about 13; at most 4 x 4 parts; 4 agents at a time),
-  each traced by its own agent on its core plus a 1-square margin; the answers are merged by
-  core ownership (each chunk keeps what lies in its own core), seam ends are snapped and
-  joined, then the orchestrator model rewrites only the strips 1 square either side of each
+  each traced by its own agent on its core plus a 1-square margin; inner borders sit at
+  quarter squares, off the grid lines walls are drawn on; the answers are merged by core
+  ownership (each chunk keeps what lies in its own core), a wall drawn along a seam by both
+  sides is kept once, wall ends are paired one to one across each seam and joined, then the orchestrator model rewrites only the strips 1 square either side of each
   seam. A test cuts real labels into chunks and merges them back with no loss (boundary
   F1 >= 0.99). `trace_map` without a window must send exactly what it always sent
   (`tests/fixtures/request_single_session.json`).

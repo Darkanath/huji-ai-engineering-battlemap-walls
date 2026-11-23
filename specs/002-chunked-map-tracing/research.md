@@ -103,6 +103,18 @@ about 150 tested lines).
 The merge never extends or invents a wall; gaps at doors survive because each agent leaves them
 and clipping does not close gaps.
 
+**Revised 23.11 after live Haiku runs (16 parts):** the owner saw walls joined wrongly and
+wall pieces missing. Three causes, each now fixed and tested: (1) seams fell on whole or half
+squares (26 x 28 map: x = 13, y = 7, 14, 21), exactly where grid-aligned walls are drawn, so a
+wall along a seam was kept by one side, both or neither depending on hundredths of a square;
+inner borders now sit at quarter squares (x.25 / x.75). (2) Ends were snapped in transitive
+groups, including ends from the same part, gluing unrelated walls; ends are now paired one to
+one across the seam (closest first, only ends on opposite sides of it, never through a door).
+(3) Only ends exactly on a seam were joined, so an agent stopping 0.1 short left a gap; ends
+within the tolerance are now paired. A wall along a seam is no longer dropped from one side;
+when both sides drew it, it is kept once. On a simulated grid-aligned 26 x 28 map with agents
+stopping at their own area, wall boundary F1 went from 0.49 to 0.95-0.96 (a test now).
+
 **Alternatives considered**: deduplicate by distance across the overlap (more thresholds, less
 predictable); `shapely` (agreed in CLAUDE.md but not installed, not needed for rectangles and
 polylines; constitution V).
