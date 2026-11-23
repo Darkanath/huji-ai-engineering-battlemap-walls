@@ -94,7 +94,7 @@ and the map-size step (one to three runs per map; `docs/results.md`, 13.11):
   `[size_step]` names the profile whose model works out the map size: `deep` (Opus) in both
   passes, because Sonnet got it right on 1 of 3 grid maps and Opus on 3 of 3. Re-measure with
   `python -m llm.run --reference --detect-size` (paid, ask first).
-- **Chunked pass** (planned, `specs/002-chunked-map-tracing/`; constitution 2.1.0): the map is
+- **Chunked pass** (built 23.11, `specs/002-chunked-map-tracing/`; constitution 2.1.0): the map is
   split into up to 4 x 4 overlapping chunks, each traced by its own agent at the same time; the
   answers are merged by fixed rules, then an orchestrator model reviews only the strips along
   the borders between chunks. A selector next to the button picks the agents' model: Haiku,
@@ -106,11 +106,15 @@ and the map-size step (one to three runs per map; `docs/results.md`, 13.11):
 ## Repo layout
 
 ```
-llm/             Claude wall tracer: agent.py (tool loop, trace_map), views.py (grid views and
-                 answer overlay), run.py (batch runs and scoring), configs/claude.toml
+llm/             Claude wall tracer: agent.py (tool loop, trace_map; with a window it is one
+                 chunk agent), views.py (grid views and answer overlay), run.py (batch runs and
+                 scoring, --chunked), configs/claude.toml. The chunked pass: orchestrator.py
+                 (layout, parallel agents, trace_chunks), merge.py (rule-based merge, seams,
+                 apply_review, seam_checks), review.py (the orchestrator model's seam review)
 postprocess/     uvtt.py: the tracer's answer -> .dd2vtt / .uvtt (answer_to_uvtt, write_uvtt)
 app/             Gradio app: service.py (logic, testable), main.py (UI wiring only),
-                 tracer.py (run_pass: the only model call), exporter.py, render.py, domain.py
+                 tracer.py (run_pass: the only model call), exporter.py, render.py, progress.py
+                 (live chunk board), domain.py
                  (Pydantic models, fractions <-> grid squares), config.py, errors.py, logging.py
 eval/            metrics.py: pixel IoU, wall boundary F1, portal recall
 data/            rasterize.py (.dd2vtt -> mask, LIGHT_TIERS), manifest.py, retier_lights.py +
@@ -156,6 +160,13 @@ Datasets and runs are mounted as Docker volumes so they persist on the host.
   with a labeled square grid; it can ask for closer crops; it submits walls (polylines and arcs),
   portals and lights in grid squares, and sees its answer drawn over the map before it finishes.
   Limits per map (turns, views, submissions, cost) are in the config.
+- **Chunked tracing:** the map is split into equal cores of about 13 squares (at most 4 x 4),
+  each traced by its own agent on its core plus a 1-square margin; the answers are merged by
+  core ownership (each chunk keeps what lies in its own core), seam ends are snapped and
+  joined, then the orchestrator model rewrites only the strips 1 square either side of each
+  seam. A test cuts real labels into chunks and merges them back with no loss (boundary
+  F1 >= 0.99). `trace_map` without a window must send exactly what it always sent
+  (`tests/fixtures/request_single_session.json`).
 - **Default map size: 25x25 squares** (1750x1750 px at 70 px per square). The app pre-fills it,
   replaces it with the size the model works out during a pass, and the user can change it. Code
   must accept any map size.

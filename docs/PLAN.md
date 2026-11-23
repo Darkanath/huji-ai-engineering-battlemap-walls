@@ -68,6 +68,16 @@ One pipeline, run once per uploaded map:
 
 Measured on the reference maps with the map-size step, one to three runs per map (v2 harness, [results.md](results.md), 13.11). The map size is worked out by Opus in both passes. The fast pass is a cheap first draft, good on buildings and weak on caves and doors; the deep pass is what fixes those. The app says so next to the button.
 
+**A third pass, chunked** (added 23.11, `specs/002-chunked-map-tracing/`): the map is split
+into up to 4 x 4 overlapping parts, each traced by its own agent at the same time (Haiku,
+Sonnet or Opus, chosen in the app); the answers are merged by fixed rules, and an
+orchestrator model (Sonnet, or Opus for Opus agents) then checks only the strips along the
+borders between parts. It is the project's multi-agent orchestration exhibit. Its time and
+cost are estimates (about 45 s and $0.29 per 25 x 25 map with Sonnet agents) until the
+owner-approved reference runs measure them. On the 25 x 25 reference maps the quarters
+already show more than the image's own resolution, so chunking there buys focus (each agent
+its own small area and budget of closer views), not detail; larger maps gain detail too.
+
 The `.dd2vtt` rasterizer (`data/rasterize.py`) is shared by evaluation: it turns both a label file and a model's answer into class masks, so every predictor is scored the same way.
 
 ## Data

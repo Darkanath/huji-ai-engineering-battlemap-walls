@@ -13,6 +13,22 @@ What the table draws on:
 - The Canny baseline and the stage-1 U-Net from weeks 2–3, as the comparison with the first
   approach.
 
+## Added 23.11: the chunked pass (feature 002)
+
+The owner decided on 23.11 to build a third pass, chunked tracing with parallel agents and an
+orchestrator, as the multi-agent exhibit (`specs/002-chunked-map-tracing/`, constitution
+2.1.0). Its code is built and tested with fakes. It changes the 13.11 "no new paid runs"
+decision for this feature only: each run below is the owner's, approved with its printed
+estimate first.
+
+- [ ] One live chunked pass in the app on the castle, Sonnet agents (about $0.29), and its
+      file imported into Roll20 (tasks T037; quickstart step 4).
+- [ ] Reference runs: `python -m llm.run --reference --chunked --agents sonnet` (about $1.2),
+      then `--agents haiku` (about $0.3), and `--agents opus` (about $3.8) only if wanted for
+      the slides (tasks T040-T042).
+- [ ] Results recorded in `docs/results.md` and the measured figures set in the config
+      (T043-T044).
+
 ## You
 
 - [ ] *(optional)* Time the manual Roll20 fixes on two traced maps, a building and the mine,

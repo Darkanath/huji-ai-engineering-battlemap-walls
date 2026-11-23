@@ -24,7 +24,7 @@ presentation (weeks 6–9). No more paid evaluation runs.
 | 3 | 3–9.11 | First U-Net on synthetic data (last week of the first approach) | [history/roadmap/week-03.md](../history/roadmap/week-03.md) |
 | 4 | 10–16.11 | **Pivot:** Claude tracer, model comparisons, .dd2vtt writer, spec and plan | [history/roadmap/week-04.md](../history/roadmap/week-04.md) |
 | 5 | 17–23.11 | The app. **Milestone: a file from the app imports into Roll20** | [week-05.md](week-05.md) |
-| 6 | 24–30.11 | Results table from existing runs (no new paid runs) | [week-06.md](week-06.md) |
+| 6 | 24–30.11 | Results table from existing runs; the chunked pass's owner-approved runs (added 23.11) | [week-06.md](week-06.md) |
 | 7 | 1–7.12 | Polish from trying the app, demo setup. **Feature freeze 07.12** | [week-07.md](week-07.md) |
 | 8 | 8–14.12 | System card, failure gallery, exhibits, demo video | [week-08.md](week-08.md) |
 | 9 | 15–23.12 | Slides, demo video, rehearsal. **Presentation 23.12** | [week-09.md](week-09.md) |
