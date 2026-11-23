@@ -363,3 +363,56 @@ noise; four maps, all 25 x 25 at 70 px per square (research.md R1), two of them 
 same layout in two styles; the single-session rows are from 13.11, a different day; Opus agents not run.
 Measured time and cost now replace the estimates in `llm/configs/claude.toml` for Sonnet and
 Haiku (T044).
+
+## Local models · spike on the laptop's CPU (23-24.11)
+
+A second, local-only app on open-weight vision models served by Ollama (`ollama/ollama:0.40.16`)
+on the laptop's CPU was specified (spec 003). Its first step was a timing spike, and the spike
+stopped the feature (owner, 24.11); its spec and code were not kept. This is a spike record, not a scored evaluation:
+no answer was rasterized or scored with the metrics, so the accuracy column says what each part's
+answer held, checked against the labels of that part.
+
+Machine: Intel Core i7-1365U (15 W, 12 threads), no GPU, WSL2 with 15.3 GiB for containers.
+Map: `dd04_a` (25 x 25), parts of a 4 x 4 layout with a 1-square margin, each traced in one
+request with the labeling rules of the Claude prompt and a JSON answer. Measured with a spike
+script (not kept); its outputs are in `runs/2026-11-23_local_spike/` (gitignored). Cost $0.00.
+Sample: one map, 1-4 parts per run, one run per setting.
+
+| Model | Setting | Per part | 16 parts at that pace | Loaded | Answer |
+| --- | --- | --- | --- | --- | --- |
+| Qwen3-VL 2B | 2 images, ctx 8192 | 115 s | 31 min | 5.05 GiB | part 1 (empty in the labels): 1 light that is not there |
+| Qwen3-VL 4B | 2 images, ctx 8192 | 139 s + 8 s load | 39 min | 7.41 GiB | part 1: empty (right) |
+| Qwen3-VL 4B | 2 smaller images (448/256 px), ctx 4096 | 138 s + 5 s load | 38 min | 5.15 GiB | part 1: empty (right) |
+| Qwen3-VL 4B | as above, 4 parts at once | none of 4 finished in 300 s | — | 5.15 GiB | — |
+| Qwen3-VL 4B | **1 combined image**, ctx 4096, parts 1-4 in turn | **73-90 s** | **22 min** | 3.33 GiB | parts 2 and 3 hold 19 walls and 8 doors/windows: it found **1 wall** |
+| Qwen3-VL 4B | part 3, free JSON | (cached image) | — | 3.33 GiB | empty |
+| Qwen3-VL 8B | part 3, forced JSON | 148 s + 8 s load | 42 min | 5.8 GiB | empty |
+| Qwen3-VL 8B | part 3, free JSON | (cached image) | — | 5.8 GiB | empty |
+| LFM3-VL 2B | part 3, forced and free JSON | 2 x 90-107 s | — | 1.46 GiB | never finished an answer: both tries ran to the 1,500-token cap |
+
+Grid step (Qwen3-VL 2B, whole map plus 4 edge strips): 271 s, found 12 x 12 for a 25 x 25 map.
+
+### What this shows
+
+- **Images, not model size, set the time.** Ollama turns every image into about 1,024 tokens
+  whatever its size; on this CPU each costs about 30 s to encode and 40 s to read (prompt
+  reading runs at about 25 tokens per second). Smaller images saved nothing; one image per
+  request instead of two took a part from about 140 s to about 80 s. The 4B was only about 25%
+  slower than the 2B; the 8B about twice as slow as the 4B.
+- **Parts at once are slower on a CPU.** Four requests at once queued for the image encoder and
+  shared the cores; each ran 2-6 times slower and none finished in 300 s.
+- **Best case: about 22 minutes for a 25 x 25 map** (4B, one image per part, one part at a
+  time), more than twice the spec's 10-minute target.
+- **No model gave usable walls** with the flow's prompt (the labeling rules plus one-shot
+  tracing instructions and a JSON answer). Qwen3-VL 4B and 8B answered empty lists on a part
+  full of walls, with and without the forced JSON shape; LFM3-VL 2B never finished an answer.
+  The models do see the map: asked in plain words, the 4B described the rooms, walls and grid
+  labels correctly. Asked for a short list of wall segments, it gave three roughly right
+  walls, then walls outside its part, then repeated a pattern until the answer cap.
+
+Known weaknesses: one map, a few parts, one run per setting; the prompt was not tuned for small
+models (the Claude labeling rules were reused as they are), so a shorter prompt, a line format
+and a repetition penalty might get rough walls; models over 8B were not tried (memory and time).
+Decision (owner, 24.11): stop here. The local app, its batch tool and the scored evaluation
+were not built, and the spike's code, spec and compose services were removed; the constitution
+stays at 2.1.0 (no local provider).

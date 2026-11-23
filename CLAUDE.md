@@ -11,6 +11,10 @@ the trained U-Net. **Model training is dropped**, and the first approach's code 
 synthetic generator, Colab training notebook, Canny baseline) was removed on 2026-11-13; it is
 in the git history up to commit `7a5979d`, and its results stay in `docs/results.md`.
 
+A local-model spike (open vision models up to 8B through Ollama on the laptop's CPU, 23-24.11)
+was tried and dropped: about 22 minutes for a 25 x 25 map at best, and no usable walls. Its
+spec and code were not kept; the numbers are in `docs/results.md` ("Local models").
+
 Where to look before starting a piece of work:
 
 - `.specify/memory/constitution.md`: the project's principles. It wins over this file where they
