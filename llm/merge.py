@@ -6,8 +6,13 @@ Design: specs/002-chunked-map-tracing/research.md R2 (layout), R4 (merge), R6 (r
 
 The merge works by **ownership**: the cores of a layout partition the map, each chunk keeps
 only the parts of its answer that lie in its own core, so an item two agents both report in
-their overlap is kept once without any matching. Walls cut at a seam are then snapped and
-joined back together.
+their overlap is kept once without any matching. Inner borders sit at quarter squares (x.25,
+x.75), off the whole and half squares where grid-aligned walls are drawn. Then, along every
+seam: a wall both neighbours drew along it is kept once, and wall ends near it are paired
+one to one across it (closest first, never through a door) and joined.
+
+Revised 23.11 after live Haiku runs showed walls lost or doubled along seams and wall ends
+joined wrongly (specs/002-chunked-map-tracing/research.md R4).
 """
 
 import math
@@ -48,9 +53,10 @@ class MergeReport:
 
     walls_in: int = 0  # polylines (walls and arcs) in all chunk answers
     walls_out: int = 0  # polylines after clipping, snapping and joining
-    pieces_dropped: int = 0  # clipped pieces shorter than min_piece, or owned by a neighbour
-    ends_snapped: int = 0
+    pieces_dropped: int = 0  # clipped pieces shorter than min_piece
+    ends_snapped: int = 0  # ends moved onto a seam to meet their partner across it
     joins: int = 0
+    walls_deduped: int = 0  # walls along a seam that both neighbours drew, kept once
     portals_kept: list[int] = field(default_factory=list)  # per chunk index
     portals_dropped: list[int] = field(default_factory=list)
     lights_kept: list[int] = field(default_factory=list)
@@ -60,9 +66,19 @@ class MergeReport:
 # --- Layout ----------------------------------------------------------------------------------
 
 
+def _off_grid(v: float) -> float:
+    """The nearest quarter square (x.25 or x.75) to `v`; a tie goes to the lower one."""
+    return math.floor((v - 0.25) * 2 + 0.5 - 1e-9) / 2 + 0.25
+
+
 def _cuts(length: float, n: int) -> list[float]:
-    """`n` equal slices of `length`, as their n + 1 borders."""
-    return [length * i / n for i in range(n)] + [float(length)]
+    """`n` nearly equal slices of `length`, as their n + 1 borders.
+
+    Inner borders are moved to the nearest quarter square, so a seam never lies on a whole or
+    half square, where grid-aligned walls are drawn; slices differ by at most half a square.
+    """
+    inner = [_off_grid(length * i / n) for i in range(1, n)]
+    return [0.0, *inner, float(length)]
 
 
 def chunk_layout(
@@ -71,8 +87,9 @@ def chunk_layout(
     """Split a map into equal cores, at most `max_per_side` across and down.
 
     nx = min(ceil(W / core_squares), max_per_side), likewise ny; each side is split evenly, so
-    there is no thin last strip. Each window is its core grown by `overlap_squares` on every
-    side that has a neighbour, clipped to the map.
+    there is no thin last strip, with inner borders at quarter squares (`_cuts`). Each window
+    is its core grown by `overlap_squares` on every side that has a neighbour, clipped to the
+    map.
     """
     w, h = map_size
     nx = max(1, min(math.ceil(w / core_squares), max_per_side))
@@ -252,60 +269,108 @@ def _midpoint(portal: dict) -> Point:
     return (portal["x1"] + portal["x2"]) / 2, (portal["y1"] + portal["y2"]) / 2
 
 
-def _on_inner_far_edge(line: Line, core: Box, extent: tuple[float, float]) -> bool:
-    """Whether a piece lies along its core's right or bottom border inside the map.
+Tagged = tuple[Line, object]  # a polyline and the side it came from (a chunk, "in", "out")
+SeamLine = tuple[str, float]  # ("x", at) for a vertical line, ("y", at) for a horizontal one
+DOOR_CLEARANCE = 0.15  # squares: two ends stay apart when a portal's middle is this close to
+# the gap between them (they are the two sides of a door)
 
-    Cores are half-open there, so such a piece belongs to the neighbour, which traced the
-    same line from its side; keeping it too would double the wall.
+
+def _across(point: Point, axis: str) -> float:
+    """The coordinate of `point` that a seam on `axis` is measured in (x for a vertical one)."""
+    return point[0] if axis == "x" else point[1]
+
+
+def _along_coord(point: Point, axis: str) -> float:
+    """The coordinate of `point` along a seam on `axis` (y for a vertical one)."""
+    return point[1] if axis == "x" else point[0]
+
+
+def _along_seam(line: Line, axis: str, at: float, tolerance: float) -> bool:
+    """Whether every point of a polyline lies within `tolerance` of the seam line."""
+    return all(abs(_across(p, axis) - at) <= tolerance for p in line)
+
+
+def _dedupe_along_seams(
+    pieces: list[Tagged], seam_lines: list[SeamLine], tolerance: float
+) -> tuple[list[Tagged], int]:
+    """Keep once a wall that both neighbours drew along a seam.
+
+    Two pieces from different sides that both lie within `tolerance` of the same seam line,
+    and whose extents along it overlap by at least 80% of the shorter one, are the same wall:
+    the one with the shorter extent is dropped. Returns the pieces and how many were dropped.
     """
-    w, h = extent
-    on_right = core[2] < w - EPS and all(abs(x - core[2]) < EPS for x, _ in line)
-    on_bottom = core[3] < h - EPS and all(abs(y - core[3]) < EPS for _, y in line)
-    return on_right or on_bottom
+    alive = [True] * len(pieces)
+    dropped = 0
+    for axis, at in seam_lines:
+        near = [i for i, (line, _) in enumerate(pieces) if _along_seam(line, axis, at, tolerance)]
+        spans = {}
+        for i in near:
+            coords = [_along_coord(p, axis) for p in pieces[i][0]]
+            spans[i] = (min(coords), max(coords))
+        for a_pos, i in enumerate(near):
+            for j in near[a_pos + 1 :]:
+                if not (alive[i] and alive[j]) or pieces[i][1] == pieces[j][1]:
+                    continue
+                (lo_i, hi_i), (lo_j, hi_j) = spans[i], spans[j]
+                overlap = min(hi_i, hi_j) - max(lo_i, lo_j)
+                shorter = min(hi_i - lo_i, hi_j - lo_j)
+                if shorter > EPS and overlap >= 0.8 * shorter:
+                    loser = j if (hi_j - lo_j) <= (hi_i - lo_i) else i
+                    alive[loser] = False
+                    dropped += 1
+    return [piece for piece, keep in zip(pieces, alive, strict=True) if keep], dropped
 
 
-def _snap_and_join(lines: list[Line], on_seam, tolerance: float) -> tuple[list[Line], int, int]:
-    """Snap polyline ends that lie on a seam and are within `tolerance` of each other to
-    their mean, then join two polylines wherever exactly two ends share a snapped point.
+def _blocked_by_door(a: Point, b: Point, portals: list[dict]) -> bool:
+    """Whether a portal sits in the gap between two wall ends (the two sides of a door)."""
+    return any(_distance_to_segment(_midpoint(p), a, b) <= DOOR_CLEARANCE for p in portals)
 
-    `on_seam(point)` says whether an end lies on a seam. Returns the lines, the number of
-    ends moved and the number of joins.
+
+def _pair_and_join(
+    pieces: list[Tagged], seam_lines: list[SeamLine], tolerance: float, portals: list[dict]
+) -> tuple[list[Line], int, int]:
+    """Join wall ends across seams, one to one.
+
+    Candidates are pairs of ends from different sides, both within `tolerance` of the same
+    seam line and of each other, on opposite sides of that line (or on it), with no portal
+    between them, so a wall running just beside a seam is never pulled onto it. The closest
+    pairs are taken first and each end is used once (no chains). Both ends of a pair move to
+    the point on the seam between them, and the two polylines become one. Returns the lines,
+    the number of ends moved and the number of joins.
     """
-    lines = [list(line) for line in lines]
-    ends = [(i, k) for i, line in enumerate(lines) for k in (0, -1) if on_seam(line[k])]
-    # Group ends closer than the tolerance (union-find over all pairs; the lists are short).
-    parent = list(range(len(ends)))
-
-    def root(a: int) -> int:
-        """The group an end belongs to."""
-        while parent[a] != a:
-            parent[a] = parent[parent[a]]
-            a = parent[a]
-        return a
-
-    for a in range(len(ends)):
-        for b in range(a + 1, len(ends)):
-            pa, pb = lines[ends[a][0]][ends[a][1]], lines[ends[b][0]][ends[b][1]]
-            if math.dist(pa, pb) <= tolerance:
-                parent[root(a)] = root(b)
-    groups: dict[int, list[tuple[int, int]]] = {}
-    for n, end in enumerate(ends):
-        groups.setdefault(root(n), []).append(end)
-
-    snapped, meeting = 0, []
-    for members in groups.values():
-        if len(members) < 2:
+    lines = [list(line) for line, _ in pieces]
+    tags = [tag for _, tag in pieces]
+    candidates = []
+    for axis, at in seam_lines:
+        near = [
+            (i, k)
+            for i, line in enumerate(lines)
+            for k in (0, -1)
+            if abs(_across(line[k], axis) - at) <= tolerance
+        ]
+        for n_a, (i, ki) in enumerate(near):
+            for j, kj in near[n_a + 1 :]:
+                if i == j or tags[i] == tags[j]:
+                    continue
+                pa, pb = lines[i][ki], lines[j][kj]
+                d = math.dist(pa, pb)
+                straddles = (_across(pa, axis) - at) * (_across(pb, axis) - at) <= EPS
+                if d <= tolerance and straddles and not _blocked_by_door(pa, pb, portals):
+                    candidates.append((d, i, ki, j, kj, axis, at))
+    used: set[tuple[int, int]] = set()
+    meetings = []
+    for _, i, ki, j, kj, axis, at in sorted(candidates):
+        if (i, ki) in used or (j, kj) in used:
             continue
-        pts = [lines[i][k] for i, k in members]
-        mean = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
-        for i, k in members:
-            lines[i][k] = mean
-        snapped += len(members)
-        if len(members) == 2 and members[0][0] != members[1][0]:
-            meeting.append(mean)
+        used |= {(i, ki), (j, kj)}
+        along = (_along_coord(lines[i][ki], axis) + _along_coord(lines[j][kj], axis)) / 2
+        point = (at, along) if axis == "x" else (along, at)
+        point = (round(point[0], 9), round(point[1], 9))
+        lines[i][ki] = lines[j][kj] = point
+        meetings.append(point)
 
     joins = 0
-    for point in meeting:
+    for point in meetings:
         found = [
             (i, k) for i, line in enumerate(lines) if line for k in (0, -1) if line[k] == point
         ]
@@ -317,7 +382,7 @@ def _snap_and_join(lines: list[Line], on_seam, tolerance: float) -> tuple[list[L
         lines[i] = a + b[1:]
         lines[j] = []
         joins += 1
-    return [line for line in lines if line], snapped, joins
+    return [line for line in lines if line], 2 * len(meetings), joins
 
 
 def _seam_lines(layout: list[Chunk]) -> tuple[list[float], list[float]]:
@@ -326,16 +391,6 @@ def _seam_lines(layout: list[Chunk]) -> tuple[list[float], list[float]]:
     xs = sorted({c.core[2] for c in layout if c.core[2] < w - EPS})
     ys = sorted({c.core[3] for c in layout if c.core[3] < h - EPS})
     return xs, ys
-
-
-def _on_lines(xs: list[float], ys: list[float]):
-    """A test for "this point lies on one of these vertical or horizontal lines"."""
-
-    def on(point: Point) -> bool:
-        """Whether `point` lies on one of the lines."""
-        return any(abs(point[0] - x) < EPS for x in xs) or any(abs(point[1] - y) < EPS for y in ys)
-
-    return on
 
 
 def merge_answers(
@@ -349,15 +404,15 @@ def merge_answers(
 
     `answers` maps chunk index to that agent's answer (chunks with none are left out). Each
     chunk keeps the parts of its walls inside its core and the portals and lights its core
-    owns; wall ends cut at a seam are snapped and joined (module docstring). The result has
-    `walls`, `portals` and `lights`, and no `arcs`.
+    owns; then a wall drawn along a seam by both neighbours is kept once, and wall ends near a
+    seam are paired across it and joined (module docstring). The result has `walls`,
+    `portals` and `lights`, and no `arcs`.
     """
-    extent = _extent(layout)
     report = MergeReport()
     n = len(layout)
     report.portals_kept, report.portals_dropped = [0] * n, [0] * n
     report.lights_kept, report.lights_dropped = [0] * n, [0] * n
-    pieces: list[Line] = []
+    pieces: list[Tagged] = []
     portals: list[dict] = []
     lights: list[dict] = []
     for chunk in layout:
@@ -368,10 +423,10 @@ def merge_answers(
         report.walls_in += len(lines)
         for line in lines:
             for piece in clip_polyline(line, chunk.core):
-                if _length(piece) < min_piece or _on_inner_far_edge(piece, chunk.core, extent):
+                if _length(piece) < min_piece:
                     report.pieces_dropped += 1
                 else:
-                    pieces.append(piece)
+                    pieces.append((piece, chunk.index))
         for portal in answer.get("portals", []):
             if owner(*_midpoint(portal), layout) == chunk.index:
                 portals.append(portal)
@@ -385,8 +440,10 @@ def merge_answers(
             else:
                 report.lights_dropped[chunk.index] += 1
     xs, ys = _seam_lines(layout)
-    joined, report.ends_snapped, report.joins = _snap_and_join(
-        pieces, _on_lines(xs, ys), join_tolerance
+    seam_lines = [("x", x) for x in xs] + [("y", y) for y in ys]
+    pieces, report.walls_deduped = _dedupe_along_seams(pieces, seam_lines, join_tolerance)
+    joined, report.ends_snapped, report.joins = _pair_and_join(
+        pieces, seam_lines, join_tolerance, portals
     )
     report.walls_out = len(joined)
     return {"walls": _walls(joined), "portals": portals, "lights": lights}, report
@@ -428,23 +485,24 @@ def apply_review(
 
     Nothing outside the strips changes: merged walls keep their parts outside the strips'
     union, merged portals and lights outside are kept; the submission contributes only its
-    parts inside the strips. Ends on the strip edges are then snapped and joined as in the
-    merge. Returns (final answer, removed counts, added counts), each count dict with
+    parts inside the strips. Wall ends near the strip edges are then paired across them (a
+    merged end with a submitted one, closest first, never through a door) and joined, as in
+    the merge. Returns (final answer, removed counts, added counts), each count dict with
     `walls`, `portals` and `lights`.
     """
     w, h = map_size
     removed = {"walls": 0, "portals": 0, "lights": 0}
     added = {"walls": 0, "portals": 0, "lights": 0}
-    lines: list[Line] = []
+    lines: list[Tagged] = []
     for line in _lines(merged):
         outside = [p for p in clip_polyline_outside(line, strips) if _length(p) >= min_piece]
         if outside != [line]:
             removed["walls"] += 1
-        lines += outside
+        lines += [(p, "out") for p in outside]
     for line in _lines(submission):
         inside = [p for p in clip_polyline_inside(line, strips) if _length(p) >= min_piece]
         added["walls"] += len(inside)
-        lines += inside
+        lines += [(p, "in") for p in inside]
 
     def split(items: list[dict], where) -> tuple[list[dict], list[dict]]:
         """Items outside and inside the strips."""
@@ -466,7 +524,8 @@ def apply_review(
 
     xs = sorted({x for s in strips for x in (s[0], s[2]) if EPS < x < w - EPS})
     ys = sorted({y for s in strips for y in (s[1], s[3]) if EPS < y < h - EPS})
-    joined, _, _ = _snap_and_join(lines, _on_lines(xs, ys), join_tolerance)
+    edges = [("x", x) for x in xs] + [("y", y) for y in ys]
+    joined, _, _ = _pair_and_join(lines, edges, join_tolerance, portals)
     return {"walls": _walls(joined), "portals": portals, "lights": lights}, removed, added
 
 
@@ -500,7 +559,11 @@ def seam_checks(
     """
     xs = [s.at for s in seam_list if s.axis == "x"]
     ys = [s.at for s in seam_list if s.axis == "y"]
-    on_seam = _on_lines(xs, ys)
+
+    def on_seam(point: Point) -> bool:
+        """Whether a wall end lies on one of the seams."""
+        return any(abs(point[0] - x) < EPS for x in xs) or any(abs(point[1] - y) < EPS for y in ys)
+
     lines = _lines(answer)
     gaps = 0
     for i, line in enumerate(lines):

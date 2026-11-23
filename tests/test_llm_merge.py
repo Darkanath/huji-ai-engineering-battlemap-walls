@@ -87,16 +87,17 @@ def test_chunk_count_is_capped_at_four_per_side(size, grid):
 
 
 def test_25_by_25_gives_four_equal_cores_and_overlapping_windows():
-    """The reference size: 2 x 2 cores of 12.5 squares, windows reaching 1 square across."""
+    """The reference size: 2 x 2 cores split at 12.25 (the quarter square nearest the middle),
+    windows reaching 1 square across."""
     chunks = layout()
     assert [c.core for c in chunks] == [
-        (0, 0, 12.5, 12.5),
-        (12.5, 0, 25, 12.5),
-        (0, 12.5, 12.5, 25),
-        (12.5, 12.5, 25, 25),
+        (0, 0, 12.25, 12.25),
+        (12.25, 0, 25, 12.25),
+        (0, 12.25, 12.25, 25),
+        (12.25, 12.25, 25, 25),
     ]
-    assert chunks[0].window == (0, 0, 13.5, 13.5)
-    assert chunks[3].window == (11.5, 11.5, 25, 25)
+    assert chunks[0].window == (0, 0, 13.25, 13.25)
+    assert chunks[3].window == (11.25, 11.25, 25, 25)
     assert [(c.index, c.col, c.row) for c in chunks] == [(0, 0, 0), (1, 1, 0), (2, 0, 1), (3, 1, 1)]
 
 
@@ -163,8 +164,8 @@ def test_clip_outside_keeps_a_polyline_clear_of_the_boxes():
 
 
 def test_a_wall_across_a_seam_comes_out_as_one_polyline():
-    """Both left-hand neighbours trace the wall across x = 12.5; its two halves meet 0.2
-    apart on the seam and are joined into one wall."""
+    """Both top neighbours trace the wall across the seam at x = 12.25; its two halves meet
+    about 0.2 apart there and are joined into one wall."""
     chunks = layout()
     answers = {
         0: {"walls": [wall((3, 5), (13.5, 5.1))]},
@@ -173,12 +174,13 @@ def test_a_wall_across_a_seam_comes_out_as_one_polyline():
     merged, report = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
     (line,) = points_of(merged)
     assert line[0] == (3, 5) and line[-1] == (22, 5)
-    assert any(math.isclose(x, 12.5) for x, _ in line)
+    assert any(math.isclose(x, 12.25) for x, _ in line)
     assert report.joins == 1 and report.ends_snapped == 2
 
 
-def test_four_walls_meeting_at_the_corner_share_one_point_and_stay_separate():
-    """At the point where four chunks meet, the four ends are snapped together, not joined."""
+def test_four_walls_meeting_at_the_corner_are_paired_not_chained():
+    """Four walls reaching the point where four parts meet: their ends end up at the corner,
+    and joins pair them one to one (at most two joins), never into one chain."""
     chunks = layout()
     answers = {
         0: {"walls": [wall((10, 10), (13, 13))]},
@@ -189,9 +191,8 @@ def test_four_walls_meeting_at_the_corner_share_one_point_and_stay_separate():
     merged, report = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
     lines = points_of(merged)
     ends = {line[i] for line in lines for i in (0, -1)}
-    inner = [p for p in ends if math.dist(p, (12.5, 12.5)) < TOL]
-    assert len(set(inner)) == 1
-    assert report.joins == 0
+    assert all(math.dist(p, (12.25, 12.25)) < 1 for p in ends if 11 < p[0] < 14 and 11 < p[1] < 14)
+    assert report.joins <= 2 and len(lines) >= 2
 
 
 def test_a_door_and_a_light_in_the_overlap_come_out_once():
@@ -209,29 +210,31 @@ def test_a_door_and_a_light_in_the_overlap_come_out_once():
 def test_a_wall_ending_on_a_seam_alone_is_not_moved_or_extended():
     """No partner within the tolerance: the end stays where the clip put it."""
     chunks = layout()
-    answers = {0: {"walls": [wall((3, 8), (14, 8))]}, 1: {"walls": [wall((12.5, 2), (20, 2))]}}
+    s = chunks[0].core[2]
+    answers = {0: {"walls": [wall((3, 8), (14, 8))]}, 1: {"walls": [wall((s, 2), (20, 2))]}}
     merged, _ = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
     lines = sorted(points_of(merged))
-    assert lines == [[(3, 8), (12.5, 8)], [(12.5, 2), (20, 2)]]
+    assert lines == [[(3, 8), (s, 8)], [(s, 2), (20, 2)]]
 
 
 def test_short_clipped_pieces_are_dropped_and_counted():
     """A sliver under min_piece left by the clip is dropped."""
     chunks = layout()
-    answers = {0: {"walls": [wall((12.49, 3), (12.49, 3.03), (13, 3.03))]}}
+    s = chunks[0].core[2]
+    answers = {0: {"walls": [wall((s - 0.01, 3), (s - 0.01, 3.03), (13, 3.03))]}}
     merged, report = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
     assert merged["walls"] == [] and report.pieces_dropped == 1
 
 
 def test_a_wall_lying_on_a_seam_is_kept_once():
-    """Both neighbours trace the same wall exactly along x = 12.5: it is not doubled."""
+    """Both neighbours trace the same wall exactly along the seam at x = 12.25: not doubled."""
     chunks = layout()
     answers = {
-        0: {"walls": [wall((12.5, 2), (12.5, 8))]},
-        1: {"walls": [wall((12.5, 2), (12.5, 8))]},
+        0: {"walls": [wall((12.25, 2), (12.25, 8))]},
+        1: {"walls": [wall((12.25, 2), (12.25, 8))]},
     }
-    merged, _ = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
-    assert points_of(merged) == [[(12.5, 2), (12.5, 8)]]
+    merged, report = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
+    assert points_of(merged) == [[(12.25, 2), (12.25, 8)]] and report.walls_deduped == 1
 
 
 def test_an_arc_across_a_seam_is_joined_like_a_wall():
@@ -335,11 +338,11 @@ def test_merging_a_label_cut_into_chunks_loses_nothing(path):
 
 
 def test_seams_of_a_two_by_two_layout():
-    """Two seams, x = 12.5 and y = 12.5, each with a 2-square strip the map's length."""
+    """Two seams, x = 12.25 and y = 12.25, each with a 2-square strip the map's length."""
     found = seams(layout(), (25, 25), strip_squares=1.0)
     assert [(s.axis, s.at, s.strip) for s in found] == [
-        ("x", 12.5, (11.5, 0, 13.5, 25)),
-        ("y", 12.5, (0, 11.5, 25, 13.5)),
+        ("x", 12.25, (11.25, 0, 13.25, 25)),
+        ("y", 12.25, (0, 11.25, 25, 13.25)),
     ]
 
 
@@ -409,10 +412,10 @@ def test_seam_checks_count_gaps_and_duplicates():
     found = seams(layout(), (25, 25), 1.0)
     answer = {
         "walls": [
-            wall((3, 5), (12.5, 5)),
-            wall((12.5, 5.4), (22, 5.4)),
-            wall((3, 8), (12.5, 8)),
-            wall((12.5, 8), (20, 8)),
+            wall((3, 5), (12.25, 5)),
+            wall((12.25, 5.4), (22, 5.4)),
+            wall((3, 8), (12.25, 8)),
+            wall((12.25, 8), (20, 8)),
         ],
         "portals": [{"x1": 4, "y1": 5, "x2": 5, "y2": 5}, {"x1": 4.2, "y1": 5, "x2": 5.2, "y2": 5}],
         "lights": [{"x": 2, "y": 2, "tier": "small"}, {"x": 9, "y": 9, "tier": "small"}],
@@ -433,19 +436,20 @@ def covered(answer: dict, y: float, x0: float, x1: float) -> bool:
 
 
 def test_a_door_gap_just_beside_a_seam_stays_open():
-    """FR-008: a door from 11.6 to 12.4 (left of x = 12.5), traced by both neighbours, keeps
-    its gap; the wall to its right is joined across the seam; the door comes out once."""
+    """FR-008: a door from 11.35 to 12.15 (just left of the seam at x = 12.25), traced by
+    both neighbours, keeps its gap; the wall to its right is joined across the seam; the door
+    comes out once."""
     chunks = layout()
-    door = {"x1": 11.6, "y1": 6, "x2": 12.4, "y2": 6}
-    left, right = wall((3, 6), (11.6, 6)), wall((12.4, 6), (22, 6))
+    door = {"x1": 11.35, "y1": 6, "x2": 12.15, "y2": 6}
+    left, right = wall((3, 6), (11.35, 6)), wall((12.15, 6), (22, 6))
     answers = {
-        0: {"walls": [left, wall((12.4, 6), (13.5, 6))], "portals": [door]},
-        1: {"walls": [wall((11.5, 6), (11.6, 6)), right], "portals": [door]},
+        0: {"walls": [left, wall((12.15, 6), (13.25, 6))], "portals": [door]},
+        1: {"walls": [wall((11.25, 6), (11.35, 6)), right], "portals": [door]},
     }
     merged, _ = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
-    assert not covered(merged, 6, 11.6, 12.4)
+    assert not covered(merged, 6, 11.35, 12.15)
     assert merged["portals"] == [door]
-    assert [(12.4, 6), (12.5, 6), (22, 6)] in points_of(merged)
+    assert [(12.15, 6), (12.25, 6), (22, 6)] in points_of(merged)
 
 
 def test_a_door_straddling_a_seam_stays_open():
@@ -457,3 +461,173 @@ def test_a_door_straddling_a_seam_stays_open():
     merged, report = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
     assert not covered(merged, 6, 12.2, 12.8)
     assert merged["portals"] == [door] and report.portals_kept == [0, 1, 0, 0]
+
+
+# --- Bugs found in live Haiku runs (23.11): seams on grid lines, wrong joins, lost pieces -----
+
+
+def test_inner_borders_fall_on_quarter_squares():
+    """Every inner border sits at x.25 or x.75, never on a whole or half square, where
+    grid-aligned walls are drawn."""
+    for size in [(25, 25), (26, 28), (27, 14), (50, 50), (40, 13)]:
+        for core in (7, 13):
+            for c in chunk_layout(size, core, 1, 4):
+                for edge, limit in ((c.core[2], size[0]), (c.core[3], size[1])):
+                    if edge < limit:
+                        assert (edge * 4) % 2 == 1, (size, core, edge)
+
+
+@pytest.mark.parametrize(
+    ("left", "right"),
+    [(13.0, 12.97), (12.95, 13.04), (13.0, 13.0), (12.9, 12.9)],
+    ids=["right-a-hair-left", "both-slightly-off", "both-exact", "both-left-of-seam"],
+)
+def test_a_wall_along_a_border_comes_out_once(left, right):
+    """Two neighbours trace the same wall along the border at x = 13.25 a little apart:
+    exactly one wall comes out, near where they drew it."""
+    chunks = chunk_layout((26, 28), 7, 1, 4)
+    seam_x = chunks[1].core[2]
+    shift = seam_x - 13.0  # draw the wall relative to this layout's seam
+    answers = {
+        1: {"walls": [wall((left + shift, 2), (left + shift, 6))]},
+        2: {"walls": [wall((right + shift, 2), (right + shift, 6))]},
+    }
+    merged, _ = merge_answers(chunks, answers, (26, 28), TOL, PIECE)
+    (line,) = points_of(merged)
+    assert all(abs(x - seam_x) <= TOL for x, _ in line)
+    assert {y for _, y in line} == {2, 6}
+
+
+def test_a_wall_along_a_border_traced_by_one_side_is_kept():
+    """Only one neighbour saw the wall on the border: it is kept, not given to the other."""
+    chunks = layout()
+    seam_x = chunks[0].core[2]
+    merged, _ = merge_answers(
+        chunks, {0: {"walls": [wall((seam_x, 2), (seam_x, 8))]}}, (25, 25), TOL, PIECE
+    )
+    assert points_of(merged) == [[(seam_x, 2), (seam_x, 8)]]
+
+
+def test_a_small_gap_at_a_border_is_closed():
+    """One agent stops its wall 0.1 before the border and the neighbour starts 0.1 after it:
+    the two halves are joined into one wall through the border."""
+    chunks = layout()
+    s = chunks[0].core[2]
+    answers = {
+        0: {"walls": [wall((3, 5), (s - 0.1, 5))]},
+        1: {"walls": [wall((s + 0.1, 5), (22, 5))]},
+    }
+    merged, report = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
+    (line,) = points_of(merged)
+    assert line[0] == (3, 5) and line[-1] == (22, 5) and report.joins == 1
+
+
+def test_ends_from_the_same_side_are_never_joined():
+    """Two walls from the same part ending near the border stay apart."""
+    chunks = layout()
+    s = chunks[0].core[2]
+    answers = {0: {"walls": [wall((3, 5), (s, 5)), wall((3, 5.2), (s, 5.2))]}}
+    merged, report = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
+    assert len(points_of(merged)) == 2 and report.joins == 0
+
+
+def test_joins_pair_ends_one_to_one_closest_first():
+    """Three ends in a row 0.2 apart across the border: only the closest cross-border pair is
+    joined; the third end stays where it was (no chain of snapping)."""
+    chunks = layout()
+    s = chunks[0].core[2]
+    answers = {
+        0: {"walls": [wall((3, 5), (s, 5))]},
+        1: {"walls": [wall((s, 5.2), (22, 5.2)), wall((s, 5.4), (22, 9))]},
+    }
+    merged, report = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
+    lines = points_of(merged)
+    assert report.joins == 1 and len(lines) == 2
+    assert [(s, 5.4), (22, 9)] in lines
+
+
+def test_ends_across_a_door_are_not_joined():
+    """A narrow door across the border: the wall ends on each side of it stay apart."""
+    chunks = layout()
+    s = chunks[0].core[2]
+    door = {"x1": s - 0.12, "y1": 5, "x2": s + 0.12, "y2": 5}
+    answers = {
+        0: {"walls": [wall((3, 5), (s - 0.12, 5))], "portals": [door]},
+        1: {"walls": [wall((s + 0.12, 5), (22, 5))], "portals": [door]},
+    }
+    merged, report = merge_answers(chunks, answers, (25, 25), TOL, PIECE)
+    assert len(points_of(merged)) == 2 and report.joins == 0
+
+
+def test_a_wall_beside_a_seam_is_not_pulled_onto_it():
+    """A vertical wall 0.25 from the seam at x = 12.75 crosses the horizontal seam at
+    y = 6.75: its two halves are joined where they meet, and it stays at x = 13."""
+    chunks = chunk_layout((26, 28), 7, 1, 4)
+    upper, lower = chunks[2].index, chunks[6].index  # the column right of x = 12.75
+    answers = {
+        upper: {"walls": [wall((13, 4), (13, 7.75))]},
+        lower: {"walls": [wall((13, 5.75), (13, 12))]},
+    }
+    merged, report = merge_answers(chunks, answers, (26, 28), TOL, PIECE)
+    (line,) = points_of(merged)
+    assert all(x == 13 for x, _ in line) and report.joins == 1
+
+
+def grid_map() -> dict:
+    """A grid-aligned 26 x 28 map in answer form: walls on whole squares (x = 7, 13, 20 and
+    y = 7, 14, 21) with a door in each, like the maps that broke the first merge."""
+    walls, portals = [], []
+    for x in (7, 13, 20):
+        walls += [wall((x, 0), (x, 3)), wall((x, 4), (x, 28))]
+        portals.append({"x1": x, "y1": 3, "x2": x, "y2": 4})
+    for y in (7, 14, 21):
+        walls += [wall((0, y), (10, y)), wall((11, y), (26, y))]
+        portals.append({"x1": 10, "y1": y, "x2": 11, "y2": y})
+    return {"walls": walls, "portals": portals, "lights": []}
+
+
+def noisy_agent(truth: dict, window, rng: random.Random, jitter: float, short: float) -> dict:
+    """What an imperfect agent reports for `window`: walls only up to `short` squares inside
+    the window's edge, each point moved by a seeded random offset of about `jitter`."""
+    inner = (window[0] + short, window[1] + short, window[2] - short, window[3] - short)
+    walls = []
+    for w in truth["walls"]:
+        for piece in clip_polyline([(p["x"], p["y"]) for p in w["points"]], inner):
+            walls.append(
+                {
+                    "points": [
+                        {"x": x + rng.gauss(0, jitter), "y": y + rng.gauss(0, jitter)}
+                        for x, y in piece
+                    ]
+                }
+            )
+    x0, y0, x1, y1 = window
+    portals = [
+        p
+        for p in truth["portals"]
+        if x0 <= (p["x1"] + p["x2"]) / 2 <= x1 and y0 <= (p["y1"] + p["y2"]) / 2 <= y1
+    ]
+    return {"walls": walls, "portals": portals, "lights": []}
+
+
+@pytest.mark.parametrize(
+    ("jitter", "short", "floor"),
+    [(0.0, 0.0, 0.99), (0.03, 1.1, 0.94)],
+    ids=["perfect-agents", "agents-stop-at-their-own-area"],
+)
+def test_a_grid_aligned_map_survives_imperfect_agents(jitter, short, floor):
+    """Haiku's 16 parts on a grid-aligned map: with perfect agents nothing is lost; with
+    agents that stop 0.1 square inside their own area and draw a little off, the merge closes
+    the gaps (wall boundary F1 >= 0.94; the first merge scored 0.49) and leaves no wall end
+    hanging on a seam. Seeded, five runs."""
+    size = (26, 28)
+    truth = grid_map()
+    chunks = chunk_layout(size, 7, 1, 4)
+    want = rasterize_mask(answer_to_uvtt(truth, size), 32)
+    for seed in range(5):
+        rng = random.Random(seed)
+        answers = {c.index: noisy_agent(truth, c.window, rng, jitter, short) for c in chunks}
+        merged, _ = merge_answers(chunks, answers, size, TOL, PIECE)
+        got = rasterize_mask(answer_to_uvtt(merged, size), 32)
+        assert score(got, want, 32)["boundary_f1_wall"] >= floor, seed
+        assert seam_checks(merged, seams(chunks, size, 1.0))["seam_gap_ends"] == 0, seed

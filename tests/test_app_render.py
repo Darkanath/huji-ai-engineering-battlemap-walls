@@ -91,7 +91,7 @@ def test_chunk_overlay_draws_the_strips_only_while_reviewing():
     """The seam strips are amber while the orchestrator reviews, and not before."""
     image = Image.new("RGB", (400, 400), (90, 90, 90))
     done = (ChunkState.done,) * 4
-    on_seam = (120, 190)  # (row, column): y = 3, x = 4.75: in the x = 5 strip, off the outlines
+    on_seam = (120, 210)  # (row, column): y = 3, x = 5.25: in the x = 4.75 strip, off the outlines
     before = np.array(chunk_overlay(image, board_snapshot(done), (10, 10))).astype(int)[on_seam]
     during = np.array(
         chunk_overlay(image, board_snapshot(done, ReviewState.reviewing), (10, 10))

@@ -357,6 +357,7 @@ def test_chunked_pass_returns_the_merged_mask_with_reports(big_image, settings, 
     final = [e for e in events if e["event"] == "pass_finished"][0]
     assert final["profile"] == "chunked" and final["chunks"] == 4 and final["agents"] == "sonnet"
     assert final["portals_dropped"] == 0 and final["lights_dropped"] == 0  # FR-013
+    assert final["walls_deduped"] == 0
 
 
 def test_one_failed_part_gives_a_partial_result(big_image, settings):
@@ -367,7 +368,7 @@ def test_one_failed_part_gives_a_partial_result(big_image, settings):
     assert result.chunks[1].state == ChunkState.failed
     assert result.chunks[1].failure == FailureKind.timeout.value
     (corner_a, corner_b) = result.untraced[0]
-    assert (corner_a.fx, corner_a.fy, corner_b.fx, corner_b.fy) == (0.5, 0, 1, 0.5)
+    assert (corner_a.fx, corner_a.fy, corner_b.fx, corner_b.fy) == (0.49, 0, 1, 0.49)
 
 
 def test_no_part_done_fails_with_the_first_failed_parts_kind(big_image, settings):

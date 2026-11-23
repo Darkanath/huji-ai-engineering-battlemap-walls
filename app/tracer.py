@@ -419,6 +419,7 @@ def _chunked_pass(
             joins=merge.joins if merge else 0,
             ends_snapped=merge.ends_snapped if merge else 0,
             pieces_dropped=merge.pieces_dropped if merge else 0,
+            walls_deduped=merge.walls_deduped if merge else 0,
             portals_dropped=sum(merge.portals_dropped) if merge else 0,
             lights_dropped=sum(merge.lights_dropped) if merge else 0,
             walls=len(walls),

@@ -48,6 +48,7 @@ ALLOWED = {
     "joins",
     "ends_snapped",
     "pieces_dropped",
+    "walls_deduped",
     "portals_dropped",
     "lights_dropped",
 }
