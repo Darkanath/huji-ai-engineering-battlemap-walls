@@ -58,6 +58,37 @@ def test_load_chunked_config_uses_the_chunk_limits_and_the_review_table():
     assert "claude-sonnet-5-5" in cfg["prices"] and "max_px" in cfg["views"]
 
 
+def test_load_chunked_config_gives_each_choice_its_part_size():
+    """The layout reads the chosen model's part size: Haiku 7, Sonnet and Opus 13."""
+    assert [
+        load_chunked_config(a)["chunked"]["core_squares"] for a in ("haiku", "sonnet", "opus")
+    ] == [
+        7,
+        13,
+        13,
+    ]
+
+
+def test_haiku_traces_sixteen_parts_four_at_a_time():
+    """A 25 x 25 map with Haiku agents: 16 parts, never more than 4 agents running at once."""
+    running, most = [0], [0]
+
+    def watch(kind, index, state):
+        """Count the agents running at the same time."""
+        if kind != "chunk":
+            return
+        if state == ChunkState.tracing:
+            running[0] += 1
+            most[0] = max(most[0], running[0])
+        else:
+            running[0] -= 1
+
+    result = trace_chunks(
+        demo_image(), (25, 25), load_chunked_config("haiku"), RoutingFake({}), on_update=watch
+    )
+    assert len(result.runs) == 16 and 1 <= most[0] <= 4
+
+
 def test_load_chunked_config_rejects_an_unknown_choice():
     """Only the choices in [chunked.agents] exist."""
     with pytest.raises(ValueError, match="fable"):

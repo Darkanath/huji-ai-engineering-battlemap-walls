@@ -189,7 +189,7 @@ def begin_pass(session: Session, kind: PassKind) -> PassTicket | None:
     if kind == PassKind.chunked:
         chunked = session.settings.chunked
         size = session.map_size.as_tuple()
-        layout = chunked.layout(size)
+        layout = chunked.layout(size, session.agents)
         session.board = ChunkBoard(layout, seams(layout, size, chunked.review.strip_squares))
     return PassTicket(
         token=session.token,
@@ -364,8 +364,8 @@ def status_line(session: Session | None) -> str:
         chunked = session.settings.chunked
         agents = chunked.agents[r.agents]
         orchestrator = chunked.agents[agents.orchestrator].label
-        n = len(r.chunks)
-        who = f"{n} {agents.label} agent{'' if n == 1 else 's'} + {orchestrator} orchestrator"
+        who = _parts_on_agents(len(r.chunks), chunked.max_parallel, agents.label)
+        who += f" + {orchestrator} orchestrator"
         line = f"Chunked · {who} · {r.elapsed_s:.0f} s · about ${r.cost_usd:.2f} · {r.counts()}"
     else:
         label = session.settings.profiles[r.kind].label
@@ -427,20 +427,28 @@ def button_labels(
     }
 
 
+def _parts_on_agents(parts: int, parallel: int, model: str) -> str:
+    """ "16 parts on 4 Haiku agents": the parts, and how many agents work on them at once."""
+    agents = min(parts, parallel)
+    return (
+        f"{parts} part{'' if parts == 1 else 's'} on {agents} {model} "
+        f"agent{'' if agents == 1 else 's'}"
+    )
+
+
 def chunked_label(
     settings: Settings, map_size: MapSize | None, detect: bool, agents: AgentChoice | None
 ) -> str:
-    """ "Chunked pass: 4 Sonnet agents (about 45 s, about $0.29, estimate)"."""
+    """ "Chunked pass: 4 parts on 4 Sonnet agents (about 45 s, about $0.29, estimate)"."""
     chunked = settings.chunked
     app = settings.app
     size = map_size or MapSize(width=app.default_width, height=app.default_height)
     agents = agents or chunked.default_agents
     choice = chunked.agents[agents]
-    n = len(chunked.layout(size.as_tuple()))
+    n = len(chunked.layout(size.as_tuple(), agents))
     seconds, cost = chunked.expected(size.as_tuple(), agents, detect, settings.size_step)
     estimate = ", estimate" if choice.estimate else ""
-    name = choice.label.split()[0]
-    who = f"{n} {name} agent{'' if n == 1 else 's'}"
+    who = _parts_on_agents(n, chunked.max_parallel, choice.label.split()[0])
     figures = f"(about {seconds:.0f} s, about ${cost:.2f}{estimate})"
     if not detect:
         return f"Chunked pass: {who} {figures}"

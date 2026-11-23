@@ -88,6 +88,7 @@ class AgentSettings(BaseModel):
     """One choice in the chunked pass's selector: the agents' model, its orchestrator, its
     whole-pass limits and its expected figures (estimates until measured)."""
 
+    core_squares: float = Field(ge=2)  # this model's part size (largest side of a core)
     name: str
     label: str
     effort: str
@@ -124,7 +125,6 @@ class ChunkedSettings(BaseModel):
     """The chunked pass: layout, agents, limits, review and merge (`[chunked]`)."""
 
     default_agents: AgentChoice
-    core_squares: float = Field(ge=2)
     overlap_squares: float = Field(ge=0)
     max_per_side: int = Field(ge=1, le=4)  # at most 4 x 4 = 16 chunks (spec FR-003)
     max_parallel: int = Field(ge=1)
@@ -136,7 +136,7 @@ class ChunkedSettings(BaseModel):
     @model_validator(mode="after")
     def _check(self) -> "ChunkedSettings":
         """All three choices exist, each orchestrator names one of them and has review
-        figures, and the overlap is less than half a core."""
+        figures, and the overlap is less than half of every model's part size."""
         missing = [a for a in ("haiku", "sonnet", "opus") if a not in self.agents]
         if missing:
             raise ValueError(f"[chunked.agents] is missing {', '.join(missing)}")
@@ -149,13 +149,17 @@ class ChunkedSettings(BaseModel):
                 raise ValueError(
                     f"[chunked.review] has no figures for orchestrator {agent.orchestrator!r}"
                 )
-        if not self.overlap_squares < self.core_squares / 2:
-            raise ValueError("[chunked] overlap_squares must be less than half of core_squares")
+        for choice, agent in self.agents.items():
+            if not self.overlap_squares < agent.core_squares / 2:
+                raise ValueError(
+                    f"[chunked] overlap_squares must be less than half of {choice}'s core_squares"
+                )
         return self
 
-    def layout(self, map_size: tuple[int, int]) -> list[Chunk]:
-        """The chunks for a map of `map_size` squares."""
-        return chunk_layout(map_size, self.core_squares, self.overlap_squares, self.max_per_side)
+    def layout(self, map_size: tuple[int, int], agents: str) -> list[Chunk]:
+        """The parts of a map of `map_size` squares for the `agents` choice's part size."""
+        core = self.agents[agents].core_squares
+        return chunk_layout(map_size, core, self.overlap_squares, self.max_per_side)
 
     def _figures(
         self, n: int, agents: str, detect: bool, size_step: SizeStep
@@ -180,7 +184,7 @@ class ChunkedSettings(BaseModel):
         seconds = ceil(n / max_parallel) * per-chunk seconds + review (n > 1) + size step
         (detect); cost = n * per-chunk cost + review (n > 1) + size step (detect).
         """
-        return self._figures(len(self.layout(map_size)), agents, detect, size_step)
+        return self._figures(len(self.layout(map_size, agents)), agents, detect, size_step)
 
     def expected_max(self, agents: str, detect: bool, size_step: SizeStep) -> tuple[float, float]:
         """The most a pass can take and cost: the same figures for a full 4 x 4 layout, shown

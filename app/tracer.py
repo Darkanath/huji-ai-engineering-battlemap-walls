@@ -333,7 +333,7 @@ def _chunked_pass(
             else:
                 traced, source = fallback_size, MapSizeSource.not_found
             if board is not None:
-                layout = chunked.layout(traced.as_tuple())
+                layout = chunked.layout(traced.as_tuple(), agents)
                 board.rebuild(
                     layout, seams(layout, traced.as_tuple(), chunked.review.strip_squares)
                 )

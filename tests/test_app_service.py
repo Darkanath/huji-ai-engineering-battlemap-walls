@@ -489,6 +489,17 @@ def test_set_agents_accepts_only_the_three_choices(session):
     assert session.agents == "haiku"
 
 
+def test_the_board_follows_the_chosen_models_part_size(session):
+    """Haiku's board has 16 parts on a 25 x 25 map; Sonnet's has 4."""
+    service.set_agents(session, "haiku")
+    ticket = service.begin_pass(session, CHUNKED)
+    assert session.board.total == 16
+    service.finish_pass(session, ticket, chunked_result())
+    service.set_agents(session, "sonnet")
+    service.begin_pass(session, CHUNKED)
+    assert session.board.total == 4
+
+
 def test_chunked_pass_starts_like_the_fast_one_and_carries_its_board(session):
     """No mask is needed; the ticket names the agents and the session gets a waiting board."""
     assert service.can_start(session, CHUNKED)
@@ -506,16 +517,22 @@ def test_chunked_button_label_follows_map_size_choice_and_detection(settings):
     labels are unchanged; with detection on, the 16-part upper bound is shown too."""
     size = MapSize(width=25, height=25)
     labels = service.button_labels(settings, size, False, "sonnet")
-    assert labels[CHUNKED] == "Chunked pass: 4 Sonnet agents (about 45 s, about $0.29, estimate)"
+    assert labels[CHUNKED] == (
+        "Chunked pass: 4 parts on 4 Sonnet agents (about 45 s, about $0.29, estimate)"
+    )
     assert labels[QUICK] == "Suggest walls (about 25 s, about $0.10)"
     assert labels[DEEP] == "Deeper examination (about 70 s, about $0.32)"
     big = service.button_labels(settings, MapSize(width=50, height=50), False, "haiku")
-    assert big[CHUNKED].startswith("Chunked pass: 16 Haiku agents (about 140 s, about $0.13")
+    assert big[CHUNKED].startswith("Chunked pass: 16 parts on 4 Haiku agents (about 140 s")
+    small_haiku = service.button_labels(settings, size, False, "haiku")[CHUNKED]
+    assert small_haiku.startswith("Chunked pass: 16 parts on 4 Haiku agents (about 140 s")
     detecting = service.button_labels(settings, size, True, "sonnet")[CHUNKED]
-    assert "4 Sonnet agents for 25 x 25 (about 53 s, about $0.32, estimate)" in detecting
+    assert "4 parts on 4 Sonnet agents for 25 x 25 (about 53 s, about $0.32, estimate)" in detecting
     assert detecting.endswith("up to $1.04 and 128 s if the detected size needs 16 parts")
     one = service.button_labels(settings, MapSize(width=10, height=10), False, "sonnet")
-    assert one[CHUNKED].startswith("Chunked pass: 1 Sonnet agent (about 25 s, about $0.06")
+    assert one[CHUNKED].startswith(
+        "Chunked pass: 1 part on 1 Sonnet agent (about 25 s, about $0.06"
+    )
 
 
 def test_progress_line_counts_parts_then_says_the_borders_are_checked(session):
@@ -553,7 +570,9 @@ def test_chunked_status_line_names_agents_orchestrator_time_and_cost(session):
     """The status line of a chunked result."""
     run(session, chunked_result(), CHUNKED)
     line = service.status_line(session)
-    assert line.startswith("Chunked · 4 Sonnet 5.5 agents + Sonnet 5.5 orchestrator · 41 s")
+    assert line.startswith(
+        "Chunked · 4 parts on 4 Sonnet 5.5 agents + Sonnet 5.5 orchestrator · 41 s"
+    )
     assert "about $0.27" in line
 
 

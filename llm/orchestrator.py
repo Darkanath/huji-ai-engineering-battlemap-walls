@@ -62,7 +62,8 @@ def load_chunked_config(agents: str, path: Path = CONFIG) -> dict:
     with three differences: `cfg["model"]` is the chosen agents' model, `cfg["limits"]` is
     `[chunked.limits]`, and `cfg["review"]` holds the orchestrator's model (the entry the
     choice's `orchestrator` names) plus `[chunked.review]`. `cfg["chunked"]` holds the
-    `[chunked]` settings with the choice's name, orchestrator, deadline and cost limit.
+    `[chunked]` settings with the choice's name, part size (`core_squares`), orchestrator,
+    deadline and cost limit.
     Raises ValueError for a choice that is not in `[chunked.agents]`.
     """
     cfg = tomllib.loads(Path(path).read_text())
@@ -77,6 +78,7 @@ def load_chunked_config(agents: str, path: Path = CONFIG) -> dict:
     settings = {k: v for k, v in chunked.items() if not isinstance(v, dict)}
     settings.update(
         agents=agents,
+        core_squares=entry["core_squares"],
         orchestrator=entry["orchestrator"],
         deadline_s=entry["deadline_s"],
         max_cost_usd=entry["max_cost_usd"],

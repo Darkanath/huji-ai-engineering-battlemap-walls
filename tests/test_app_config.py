@@ -102,8 +102,8 @@ def test_shipped_chunked_settings_load():
         (lambda c: c["agents"]["opus"].update(orchestrator="fable"), "orchestrator"),
         (lambda c: c["agents"]["haiku"].update(name="claude-unknown"), "no price"),
         (lambda c: c.update(max_per_side=5), "max_per_side"),
-        (lambda c: c.update(overlap_squares=7), "overlap"),
-        (lambda c: c.update(core_squares=1), "core_squares"),
+        (lambda c: c["agents"]["haiku"].update(core_squares=2), "overlap"),
+        (lambda c: c["agents"]["sonnet"].update(core_squares=1), "core_squares"),
     ],
     ids=["missing-choice", "bad-orchestrator", "no-price", "too-many", "overlap", "tiny-core"],
 )
@@ -127,7 +127,20 @@ def test_expected_figures_follow_the_map_size_choice_and_detection():
     seconds, cost = chunked.expected((13, 13), "sonnet", detect=False, size_step=settings.size_step)
     assert seconds == pytest.approx(25) and cost == pytest.approx(0.06)  # one chunk, no review
     _, cost = chunked.expected((50, 50), "opus", detect=False, size_step=settings.size_step)
-    assert len(chunked.layout((50, 50))) == 16 and cost == pytest.approx(3.35)
+    assert len(chunked.layout((50, 50), "opus")) == 16 and cost == pytest.approx(3.35)
+
+
+def test_each_model_has_its_own_part_size():
+    """Haiku gets smaller parts (about 7 squares: 16 on 25 x 25) than Sonnet and Opus (13:
+    4 on 25 x 25); every model keeps the 16-part cap and 4 agents at a time."""
+    settings = load_settings()
+    chunked = settings.chunked
+    assert [chunked.agents[a].core_squares for a in ("haiku", "sonnet", "opus")] == [7, 13, 13]
+    assert len(chunked.layout((25, 25), "haiku")) == 16
+    assert len(chunked.layout((25, 25), "sonnet")) == 4
+    assert len(chunked.layout((200, 200), "haiku")) == 16
+    seconds, cost = chunked.expected((25, 25), "haiku", detect=False, size_step=settings.size_step)
+    assert seconds == pytest.approx(140) and cost == pytest.approx(0.13)
 
 
 def test_expected_max_is_the_four_by_four_layout():
